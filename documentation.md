@@ -53,7 +53,7 @@ By default, the chain resolves in this order:
 2. **FreeIPAPI.com** (`https://freeipapi.com/api/json/{ip}`) - Secondary fallback.
 
 ### Configuring Fallbacks
-You can enable/disable, configure timeouts, or define a custom API template on an advanced instance:
+You can customize timeouts, pass authentication headers (e.g. for enterprise API keys), and supply a custom response mapper function:
 ```typescript
 import { GeoIP } from "mr-geoip";
 
@@ -61,7 +61,19 @@ const geo = GeoIP.create({
   fallbackApi: {
     enabled: true,
     timeoutMs: 2500, // Timeout after 2.5s per request
-    urlTemplate: "https://my-internal-geo-api.com/lookup/{ip}" // Optional custom endpoint
+    urlTemplate: "https://my-enterprise-geo-api.com/lookup/{ip}",
+    // Custom HTTP headers
+    headers: {
+      "Authorization": "Bearer my-secret-token",
+      "x-api-key": "enterprise-key"
+    },
+    // Custom mapper function to translate your API's JSON response
+    mapResult: (body) => ({
+      country: body.location.country_name,
+      countryCode: body.location.iso_code,
+      city: body.location.city_name,
+      timezone: body.location.time_zone
+    })
   }
 });
 ```

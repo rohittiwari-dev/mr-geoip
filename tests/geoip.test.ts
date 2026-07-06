@@ -545,11 +545,11 @@ describe("GeoIP", () => {
       expect(result!.countryCode).toBe("US");
     });
 
-    it("falls back to ipapi.co when FreeIPAPI.com fails (Multi-Tier chain)", async () => {
-      const mockIpapiResult = {
-        country_name: "Fallbackland",
-        country_code: "FB",
-        city: "Fallback City",
+    it("falls back to freeipapi.com when ipapi.co fails (Multi-Tier chain)", async () => {
+      const mockFreeIpApiResult = {
+        countryName: "Fallbackland",
+        countryCode: "FB",
+        cityName: "Fallback City",
       };
 
       const originalFetch = globalThis.fetch;
@@ -559,7 +559,7 @@ describe("GeoIP", () => {
         const urlStr = String(url);
         requestedUrls.push(urlStr);
 
-        if (urlStr.includes("freeipapi.com")) {
+        if (urlStr.includes("://ipapi.co")) {
           // Tier 1 fails
           return {
             ok: false,
@@ -570,7 +570,7 @@ describe("GeoIP", () => {
         // Tier 2 succeeds
         return {
           ok: true,
-          json: async () => mockIpapiResult,
+          json: async () => mockFreeIpApiResult,
         } as any;
       }) as any;
 
@@ -586,8 +586,8 @@ describe("GeoIP", () => {
         const result = await geo.lookupAsync("8.8.8.8");
 
         expect(requestedUrls).toHaveLength(2);
-        expect(requestedUrls[0]).toContain("freeipapi.com");
-        expect(requestedUrls[1]).toContain("ipapi.co");
+        expect(requestedUrls[0]).toContain("ipapi.co");
+        expect(requestedUrls[1]).toContain("freeipapi.com");
         expect(result.country).toBe("Fallbackland");
         expect(result.countryCode).toBe("FB");
 

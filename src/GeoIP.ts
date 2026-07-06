@@ -448,8 +448,8 @@ export class GeoIP {
     }
 
     const chain = [
-      "https://freeipapi.com/api/json/{ip}",
       "https://ipapi.co/{ip}/json/",
+      "https://freeipapi.com/api/json/{ip}",
     ];
 
     const errors: Error[] = [];

@@ -1,0 +1,23 @@
+{
+  "name": "mr-geopip",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "update:ipdb": "bun run scripts/update-ip-dbs.ts"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@maxmind/geoip2-node": "^7.0.0"
+  }
+}

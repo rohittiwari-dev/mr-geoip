@@ -1,0 +1,8 @@
+{
+  "updatedAt": "2026-07-06T06:57:37.926Z",
+  "provider": "GeoIP Lite (free)",
+  "files": [
+    "GeoLite2-City.mmdb",
+    "GeoLite2-ASN.mmdb"
+  ]
+}

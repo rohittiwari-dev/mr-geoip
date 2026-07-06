@@ -22,7 +22,7 @@
       }
     }
   },
-  "description": "Production-grade, framework-agnostic IP geolocation with LRU caching and custom data persistence.",
+  "description": "A framework-agnostic IP geolocation with LRU caching and custom data persistence.",
   "bin": {
     "mr-geoip-update": "./dist/cli.js"
   },

@@ -31,7 +31,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "documentation.md"
   ],
   "keywords": [
     "geoip",
@@ -40,9 +42,25 @@
     "maxmind",
     "mmdb",
     "lru-cache",
-    "ip-lookup"
+    "ip-lookup",
+    "serverless",
+    "typescript",
+    "bun",
+    "deno"
   ],
   "license": "MIT",
+  "author": "Rohit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rohit/mr-geoip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rohit/mr-geoip/issues"
+  },
+  "homepage": "https://github.com/Rohit/mr-geoip#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

@@ -1,4 +1,4 @@
-import type { IpDetails, LookupOptions } from "./types";
+import type { IpDetails, LookupOptions, LookupAsyncOptions } from "./types";
 import { GeoIP } from "./GeoIP";
 
 // ---------------------------------------------------------------------------
@@ -35,4 +35,21 @@ function getDefault(): GeoIP {
  */
 export function lookup(ip: string, options?: LookupOptions): IpDetails {
   return getDefault().lookup(ip, options);
+}
+
+/**
+ * Asynchronously look up geolocation data for an IP address.
+ *
+ * Supports querying a fallback public API if the local MMDB databases
+ * are missing or unreadable.
+ *
+ * @example
+ * ```ts
+ * import { lookupAsync } from "mr-geopip";
+ *
+ * const info = await lookupAsync("8.8.8.8");
+ * ```
+ */
+export async function lookupAsync(ip: string, options?: LookupAsyncOptions): Promise<IpDetails> {
+  return getDefault().lookupAsync(ip, options);
 }

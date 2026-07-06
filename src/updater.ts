@@ -50,26 +50,6 @@ const DATASETS: ReadonlyArray<{
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function formatMonth(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-function monthCandidates(lookbackMonths: number): string[] {
-  const current = new Date();
-  const result: string[] = [];
-
-  for (let i = 0; i < lookbackMonths; i += 1) {
-    const d = new Date(
-      Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - i, 1),
-    );
-    result.push(formatMonth(d));
-  }
-
-  return result;
-}
-
 async function extractBody(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -104,44 +84,33 @@ async function cleanupTemp(targetPath: string): Promise<void> {
 async function downloadDataset(
   dataset: Dataset,
   outputDir: string,
-  urls: string[],
+  url: string,
   dryRun: boolean,
 ): Promise<void> {
   const targetPath = join(outputDir, dataset.fileName);
   console.log(`\n[${dataset.label}] target: ${targetPath}`);
 
   if (dryRun) {
-    for (const url of urls) {
-      console.log(`  - ${url}`);
-    }
+    console.log(`  - ${url}`);
     return;
   }
 
-  const failures: string[] = [];
+  process.stdout.write(`  Trying ${url} ... `);
+  try {
+    const data = await extractBody(url);
 
-  for (const url of urls) {
-    process.stdout.write(`  Trying ${url} ... `);
-    try {
-      const data = await extractBody(url);
-
-      if (data.length < 1024) {
-        throw new Error(`Downloaded payload too small (${data.length} bytes)`);
-      }
-
-      await writeAtomic(targetPath, data);
-      console.log(`OK (${data.length.toLocaleString()} bytes)`);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${url} -> ${message}`);
-      console.log("failed");
-      await cleanupTemp(targetPath);
+    if (data.length < 1024) {
+      throw new Error(`Downloaded payload too small (${data.length} bytes)`);
     }
-  }
 
-  throw new Error(
-    `Could not update ${dataset.label}. Attempted URLs:\n${failures.map((line) => `- ${line}`).join("\n")}`,
-  );
+    await writeAtomic(targetPath, data);
+    console.log(`OK (${data.length.toLocaleString()} bytes)`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log("failed");
+    await cleanupTemp(targetPath);
+    throw new Error(`Could not update ${dataset.label} from URL: ${url} -> ${message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,23 +134,16 @@ async function downloadDataset(
  */
 export async function updateDb(config: UpdateConfig = {}): Promise<void> {
   const outputDir = config.outputDir ?? "data";
-  const lookbackMonths = config.lookbackMonths ?? DEFAULT_LOOKBACK_MONTHS;
   const dryRun = config.dryRun ?? false;
 
-  const months = monthCandidates(lookbackMonths);
-
   console.log(`Updating free IP databases into "${outputDir}"`);
-  console.log(`Lookback window: ${lookbackMonths} month(s)`);
   if (dryRun) {
     console.log("Dry run mode: no files will be written.");
   }
 
   for (const item of DATASETS) {
-    const overrideUrl = config[item.configKey];
-    const urls = overrideUrl
-      ? [overrideUrl]
-      : months.map(item.dataset.buildUrl);
-    await downloadDataset(item.dataset, outputDir, urls, dryRun);
+    const url = config[item.configKey] ?? item.dataset.buildUrl("");
+    await downloadDataset(item.dataset, outputDir, url, dryRun);
   }
 
   if (!dryRun) {

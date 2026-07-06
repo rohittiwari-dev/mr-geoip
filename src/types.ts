@@ -80,6 +80,11 @@ export interface LookupOptions {
   traits?: boolean;
 }
 
+export interface LookupAsyncOptions extends LookupOptions {
+  /** Skip cache read / write checks if set to true. */
+  bypassCache?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Custom data
 // ---------------------------------------------------------------------------
@@ -119,6 +124,28 @@ export interface CacheStats {
   size: number;
   /** Configured maximum size. */
   maxSize: number;
+}
+
+/**
+ * Metadata about an opened MMDB database.
+ */
+export interface DatabaseMetadata {
+  /** The epoch timestamp when this database was compiled by MaxMind. */
+  buildEpoch: number;
+  /** The type of database (e.g. `"GeoLite2-City"`). */
+  databaseType: string;
+  /** Supported IP version (4 or 6). */
+  ipVersion: number;
+  /** Free-form description of the database. */
+  description?: string;
+}
+
+/**
+ * Metadata snapshot of the active GeoIP databases (both city and asn).
+ */
+export interface GeoIPMetadata {
+  city: DatabaseMetadata | null;
+  asn: DatabaseMetadata | null;
 }
 
 /**
@@ -182,6 +209,42 @@ export interface GeoIPConfig {
    * @default false
    */
   traits?: boolean;
+
+  /**
+   * Options for enabling automatic background database updates.
+   */
+  autoUpdate?: AutoUpdateConfig;
+
+  /**
+   * Options for querying a public API if databases are missing/empty.
+   */
+  fallbackApi?: FallbackApiConfig;
+}
+
+/**
+ * Configuration options for using a free public lookup API fallback.
+ */
+export interface FallbackApiConfig {
+  /** If true, fallback queries will run when the database files are missing. */
+  enabled: boolean;
+  /** Custom URL template, where `{ip}` is replaced with the IP string. @default "https://ipapi.co/{ip}/json/" */
+  urlTemplate?: string;
+  /** Timeout in milliseconds for the HTTP request. @default 5000 */
+  timeoutMs?: number;
+}
+
+/**
+ * Configuration options for background auto-updates.
+ */
+export interface AutoUpdateConfig {
+  /** How often (in milliseconds) to run update checks. @default 86_400_000 (24 hours) */
+  intervalMs?: number;
+  /** Lookup window for updates. */
+  lookbackMonths?: number;
+  /** Optional callback fired when the database has successfully updated and reloaded. */
+  onUpdate?: () => void;
+  /** Optional callback fired if an update fails. */
+  onError?: (err: Error) => void;
 }
 
 // ---------------------------------------------------------------------------

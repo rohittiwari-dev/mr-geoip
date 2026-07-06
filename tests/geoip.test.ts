@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
+import { lookup, lookupAsync, createCustomIpData } from "../src/index";
 import { GeoIP } from "../src/GeoIP";
-import { lookup } from "../src/singleton";
 import {
   InvalidIPError,
   DatabaseNotFoundError,
@@ -335,6 +335,157 @@ describe("GeoIP", () => {
     it("customDataSize returns 0 when store not configured", () => {
       const geo = GeoIP.create();
       expect(geo.customDataSize).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // New Production Features Tests
+  // =========================================================================
+
+  describe("Custom Data Validation", () => {
+    it("createCustomIpData validates structure correctly", () => {
+      // Valid data should pass
+      const valid = createCustomIpData({
+        country: "USA",
+        coordinates: { latitude: 37.7, longitude: -122.4 },
+        traits: { isAnonymous: true } as any,
+      });
+      expect(valid.country).toBe("USA");
+
+      // Invalid coordinates type
+      expect(() =>
+        createCustomIpData({
+          coordinates: { latitude: "bad" } as any,
+        }),
+      ).toThrow(TypeError);
+
+      // Invalid traits type
+      expect(() =>
+        createCustomIpData({
+          traits: "bad" as any,
+        }),
+      ).toThrow(TypeError);
+
+      // Invalid trait flag type
+      expect(() =>
+        createCustomIpData({
+          traits: { isAnonymous: "yes" } as any,
+        }),
+      ).toThrow(TypeError);
+
+      // Invalid property type (number passed to string field)
+      expect(() =>
+        createCustomIpData({
+          country: 123 as any,
+        }),
+      ).toThrow(TypeError);
+    });
+
+    it("GeoIP.setCustomData automatically validates the payload", async () => {
+      const geo = GeoIP.create({ customStore: { filePath: CUSTOM_FILE } });
+
+      await expect(
+        geo.setCustomData("10.0.0.1", { country: 123 as any }),
+      ).rejects.toThrow(TypeError);
+
+      await geo.close();
+    });
+  });
+
+  describe("Advisory File Locking", () => {
+    it("safely handles concurrent writes to the same custom store file", async () => {
+      const geo = GeoIP.create({
+        customStore: { filePath: CUSTOM_FILE, flushIntervalMs: 50 },
+      });
+
+      // Fire off multiple concurrent set calls
+      await Promise.all([
+        geo.setCustomData("10.0.0.1", { organization: "A" }),
+        geo.setCustomData("10.0.0.2", { organization: "B" }),
+        geo.setCustomData("10.0.0.3", { organization: "C" }),
+      ]);
+
+      // Delay to let the debounce write finish
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(geo.lookup("10.0.0.1").organization).toBe("A");
+      expect(geo.lookup("10.0.0.2").organization).toBe("B");
+      expect(geo.lookup("10.0.0.3").organization).toBe("C");
+
+      await geo.close();
+    });
+  });
+
+  describe("Database Metadata Inspection", () => {
+    it("returns correct database metadata snapshot", () => {
+      const geo = GeoIP.create();
+      const meta = geo.dbMetadata;
+
+      expect(meta.city).not.toBeNull();
+      expect(meta.city!.databaseType).toContain("City");
+      expect(typeof meta.city!.buildEpoch).toBe("number");
+      expect(meta.city!.ipVersion).toBe(6);
+
+      expect(meta.asn).not.toBeNull();
+      expect(meta.asn!.databaseType).toContain("ASN");
+      expect(typeof meta.asn!.buildEpoch).toBe("number");
+    });
+  });
+
+  describe("Fallback API & Async Geolocation", () => {
+    it("lookupAsync falls back to HTTP API when fallbackApi is enabled", async () => {
+      // Mock global fetch to return a predefined response
+      const mockResult = {
+        country_name: "Mockland",
+        country_code: "ML",
+        region: "Mock Region",
+        city: "Mock City",
+        latitude: 12.34,
+        longitude: 56.78,
+        asn: 99999,
+        org: "Mock ISP",
+        in_eu: true,
+      };
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url: any) => {
+        expect(url).toContain("8.8.8.8");
+        return {
+          ok: true,
+          json: async () => mockResult,
+        } as any;
+      };
+
+      try {
+        const geo = GeoIP.create({
+          fallbackApi: { enabled: true },
+        });
+
+        // Set readers to null to force API fallback
+        (geo as any).bundledReaders = null;
+        (geo as any).userReaders = null;
+
+        const result = await geo.lookupAsync("8.8.8.8");
+
+        expect(result.country).toBe("Mockland");
+        expect(result.countryCode).toBe("ML");
+        expect(result.city).toBe("Mock City");
+        expect(result.coordinates).toEqual({ latitude: 12.34, longitude: 56.78 });
+        expect(result.asn).toBe(99999);
+        expect(result.organization).toBe("Mock ISP");
+        expect(result.euMember).toBe(true);
+
+        await geo.close();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("lookupAsync one-liner works as expected", async () => {
+      // Direct one-liner async lookup (uses local DB)
+      const result = await lookupAsync("8.8.8.8");
+      expect(result.ip).toBe("8.8.8.8");
+      expect(result.countryCode).toBe("US");
     });
   });
 });

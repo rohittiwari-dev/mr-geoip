@@ -1,4 +1,4 @@
-import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir, stat, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { CustomIpData } from "./types";
 
@@ -66,19 +66,67 @@ export class CustomDataStore {
     }
   }
 
+  private async acquireLock(): Promise<void> {
+    const lockPath = `${this.filePath}.lock`;
+    const maxRetries = 3;
+    const retryDelayMs = 200;
+    const maxLockAgeMs = 10_000;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await mkdir(lockPath);
+        return;
+      } catch (err: any) {
+        if (err.code === "EEXIST") {
+          try {
+            const stats = await stat(lockPath);
+            const age = Date.now() - stats.mtimeMs;
+            if (age > maxLockAgeMs) {
+              await rm(lockPath, { recursive: true, force: true });
+              continue;
+            }
+          } catch {
+            // Stat failed — proceed to retry
+          }
+
+          if (attempt === maxRetries) {
+            throw new Error(`Failed to acquire lock for custom store: ${this.filePath} after ${maxRetries} attempts.`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
+
+  private async releaseLock(): Promise<void> {
+    const lockPath = `${this.filePath}.lock`;
+    try {
+      await rm(lockPath, { recursive: true, force: true });
+    } catch {
+      // Ignore release failures
+    }
+  }
+
   /** Immediately flush pending changes to disk (atomic write). */
   async flush(): Promise<void> {
     if (!this.dirty) return;
 
-    const obj: Record<string, CustomIpData> = Object.fromEntries(this.data);
-    const json = JSON.stringify(obj, null, 2);
-    const tmpPath = `${this.filePath}.tmp`;
+    await this.acquireLock();
+    try {
+      const obj: Record<string, CustomIpData> = Object.fromEntries(this.data);
+      const json = JSON.stringify(obj, null, 2);
+      const tmpPath = `${this.filePath}.tmp`;
 
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(tmpPath, json, "utf-8");
-    await rename(tmpPath, this.filePath);
+      await mkdir(dirname(this.filePath), { recursive: true });
+      await writeFile(tmpPath, json, "utf-8");
+      await rename(tmpPath, this.filePath);
 
-    this.dirty = false;
+      this.dirty = false;
+    } finally {
+      await this.releaseLock();
+    }
   }
 
   private scheduleFlush(): void {

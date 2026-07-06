@@ -4,6 +4,10 @@ import type {
   GeoIPConfig,
   IpDetails,
   LookupOptions,
+  GeoIPMetadata,
+  LookupAsyncOptions,
+  AutoUpdateConfig,
+  FallbackApiConfig,
 } from "./types";
 import { GeoIPCache } from "./cache";
 import { CustomDataStore } from "./custom-store";
@@ -17,7 +21,7 @@ import {
   emptyIpDetails,
   type MmdbReaders,
 } from "./reader";
-import { isValidIP } from "./validate";
+import { isValidIP, validateCustomIpData } from "./validate";
 import {
   InvalidIPError,
   CustomStoreNotConfiguredError,
@@ -103,7 +107,7 @@ function applyCustomData(base: IpDetails, custom: CustomIpData): IpDetails {
  * ```
  */
 export class GeoIP {
-  private bundledReaders: MmdbReaders;
+  private bundledReaders: MmdbReaders | null;
   private userReaders: MmdbReaders | null;
   private readonly cache: GeoIPCache | null;
   private customStore: CustomDataStore | null;
@@ -112,13 +116,15 @@ export class GeoIP {
   private readonly cityDbFile: string;
   private readonly asnDbFile: string;
   private readonly includeTraitsByDefault: boolean;
+  private autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly fallbackApiConfig: FallbackApiConfig | null = null;
 
   // -----------------------------------------------------------------------
   // Construction (private — use static create())
   // -----------------------------------------------------------------------
 
   private constructor(
-    bundledReaders: MmdbReaders,
+    bundledReaders: MmdbReaders | null,
     userReaders: MmdbReaders | null,
     cache: GeoIPCache | null,
     customStore: CustomDataStore | null,
@@ -127,6 +133,7 @@ export class GeoIP {
     cityDbFile: string,
     asnDbFile: string,
     includeTraitsByDefault: boolean,
+    fallbackApiConfig: FallbackApiConfig | null,
   ) {
     this.bundledReaders = bundledReaders;
     this.userReaders = userReaders;
@@ -137,6 +144,7 @@ export class GeoIP {
     this.cityDbFile = cityDbFile;
     this.asnDbFile = asnDbFile;
     this.includeTraitsByDefault = includeTraitsByDefault;
+    this.fallbackApiConfig = fallbackApiConfig;
   }
 
   /**
@@ -166,24 +174,38 @@ export class GeoIP {
   static create(config: GeoIPConfig = {}): GeoIP {
     const cityDbFile = config.cityDbFile ?? DEFAULT_CITY_FILE;
     const asnDbFile = config.asnDbFile ?? DEFAULT_ASN_FILE;
+    const fallbackEnabled = config.fallbackApi?.enabled ?? false;
 
-    // 1. Always open bundled readers
-    const bundledReaders = openReadersSync(
-      BUNDLED_DATA_DIR,
-      cityDbFile,
-      asnDbFile,
-      { required: true },
-    )!;
-
-    // 2. Optionally open user's readers (merged over bundled)
-    let userReaders: MmdbReaders | null = null;
-    if (config.dataDir) {
-      userReaders = openReadersSync(
-        config.dataDir,
+    // 1. Open bundled readers (graceful fallback if enabled)
+    let bundledReaders: MmdbReaders | null = null;
+    try {
+      bundledReaders = openReadersSync(
+        BUNDLED_DATA_DIR,
         cityDbFile,
         asnDbFile,
         { required: true },
       );
+    } catch (err) {
+      if (!fallbackEnabled) {
+        throw err;
+      }
+    }
+
+    // 2. Open user's readers (graceful fallback if enabled)
+    let userReaders: MmdbReaders | null = null;
+    if (config.dataDir) {
+      try {
+        userReaders = openReadersSync(
+          config.dataDir,
+          cityDbFile,
+          asnDbFile,
+          { required: true },
+        );
+      } catch (err) {
+        if (!fallbackEnabled) {
+          throw err;
+        }
+      }
     }
 
     // 3. Cache
@@ -201,6 +223,7 @@ export class GeoIP {
       cityDbFile,
       asnDbFile,
       config.traits ?? false,
+      config.fallbackApi ?? null,
     );
 
     // 5. Custom store (loaded async in background — non-blocking)
@@ -211,6 +234,11 @@ export class GeoIP {
       ).then((store) => {
         instance.customStore = store;
       });
+    }
+
+    // 6. Start auto-updater scheduler if configured
+    if (config.autoUpdate) {
+      instance.startAutoUpdate(config.autoUpdate);
     }
 
     return instance;
@@ -249,22 +277,28 @@ export class GeoIP {
       }
     }
 
-    // 2. Bundled DB lookup (always)
-    let result: IpDetails;
-    try {
-      result = performLookup(this.bundledReaders, ip);
-    } catch {
-      result = emptyIpDetails(ip);
+    // 2. Bundled DB lookup (if loaded)
+    let result: IpDetails | null = null;
+    if (this.bundledReaders) {
+      try {
+        result = performLookup(this.bundledReaders, ip);
+      } catch {
+        result = emptyIpDetails(ip);
+      }
+
+      // 3. User DB lookup (if provided) — merge over bundled
+      if (this.userReaders) {
+        try {
+          const userResult = performLookup(this.userReaders, ip);
+          result = mergeResults(userResult, result);
+        } catch {
+          // User DB doesn't have this IP — keep bundled result
+        }
+      }
     }
 
-    // 3. User DB lookup (if provided) — merge over bundled
-    if (this.userReaders) {
-      try {
-        const userResult = performLookup(this.userReaders, ip);
-        result = mergeResults(userResult, result);
-      } catch {
-        // User DB doesn't have this IP — keep bundled result
-      }
+    if (!result) {
+      result = emptyIpDetails(ip);
     }
 
     // 4. Custom store overlay (if configured + ready)
@@ -286,6 +320,145 @@ export class GeoIP {
     }
 
     return result;
+  }
+
+  /**
+   * Asynchronously look up geolocation data for an IP address.
+   *
+   * Supports querying a fallback public API if the local MMDB databases
+   * are missing/empty (and `fallbackApi.enabled` is configured to `true`).
+   */
+  async lookupAsync(ip: string, options?: LookupAsyncOptions): Promise<IpDetails> {
+    if (!isValidIP(ip)) {
+      throw new InvalidIPError(ip);
+    }
+
+    const includeTraits = options?.traits ?? this.includeTraitsByDefault;
+    const bypassCache = options?.bypassCache ?? false;
+
+    // 1. Cache hit?
+    if (this.cache && !bypassCache) {
+      const cached = this.cache.get(ip);
+      if (cached) {
+        if (!includeTraits) {
+          const { traits, ...rest } = cached;
+          return rest;
+        }
+        return cached;
+      }
+    }
+
+    let result: IpDetails | null = null;
+
+    // 2. Try Local MMDB Lookups first (if loaded)
+    if (this.bundledReaders) {
+      try {
+        result = performLookup(this.bundledReaders, ip);
+      } catch {
+        result = emptyIpDetails(ip);
+      }
+
+      if (this.userReaders) {
+        try {
+          const userResult = performLookup(this.userReaders, ip);
+          result = mergeResults(userResult, result);
+        } catch {}
+      }
+    }
+
+    // 3. Fallback to API if database was not found/loaded and fallback is enabled
+    if (!result && this.fallbackApiConfig?.enabled) {
+      try {
+        result = await this.queryFallbackApi(ip);
+      } catch (err: any) {
+        // Fallback failed too — default to empty details
+        result = emptyIpDetails(ip);
+      }
+    }
+
+    // Default to empty details if both MMDB and API lookup yielded nothing
+    if (!result) {
+      result = emptyIpDetails(ip);
+    }
+
+    // 4. Custom store overlay (if configured + ready)
+    if (this.customStore) {
+      const custom = this.customStore.get(ip);
+      if (custom) {
+        result = applyCustomData(result, custom);
+      }
+    }
+
+    // 5. Populate cache (always with full result)
+    if (this.cache && !bypassCache) {
+      this.cache.set(ip, result);
+    }
+
+    if (!includeTraits) {
+      const { traits, ...rest } = result;
+      return rest;
+    }
+
+    return result;
+  }
+
+  private async queryFallbackApi(ip: string): Promise<IpDetails> {
+    const urlTemplate = this.fallbackApiConfig?.urlTemplate ?? "https://ipapi.co/{ip}/json/";
+    const timeoutMs = this.fallbackApiConfig?.timeoutMs ?? 5000;
+    const url = urlTemplate.replace("{ip}", ip);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const body = await response.json();
+      return this.mapApiResult(ip, body);
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  }
+
+  private mapApiResult(ip: string, body: any): IpDetails {
+    const latitude = Number(body.latitude);
+    const longitude = Number(body.longitude);
+
+    return {
+      ip,
+      country: body.country_name || body.country || null,
+      countryCode: body.country_code || body.countryCode || null,
+      subdivision: body.region || body.regionName || null,
+      subdivisionCode: body.region_code || body.region || null,
+      continent: body.continent_name || null,
+      continentCode: body.continent_code || null,
+      city: body.city || null,
+      postalCode: body.postal || body.zip || null,
+      euMember: body.in_eu !== undefined ? !!body.in_eu : (body.is_in_european_union !== undefined ? !!body.is_in_european_union : false),
+      timezone: body.timezone || null,
+      coordinates: !Number.isNaN(latitude) && !Number.isNaN(longitude) ? { latitude, longitude } : null,
+      asn: body.asn ? Number(body.asn) : null,
+      organization: body.org || body.organization || body.asn_org || null,
+      network: body.network || null,
+      traits: {
+        isAnonymous: !!body.is_anonymous,
+        isAnonymousProxy: !!body.is_anonymous_proxy,
+        isAnonymousVpn: !!body.is_anonymous_vpn,
+        isHostingProvider: !!body.is_hosting,
+        isLegitimateProxy: false,
+        isPublicProxy: false,
+        isResidentialProxy: false,
+        isSatelliteProvider: false,
+        isTorExitNode: !!body.is_tor,
+        isAnycast: false,
+      },
+    };
   }
 
   // -----------------------------------------------------------------------
@@ -319,6 +492,7 @@ export class GeoIP {
   async setCustomData(ip: string, data: CustomIpData): Promise<void> {
     const store = await this.ensureCustomStore();
     if (!isValidIP(ip)) throw new InvalidIPError(ip);
+    validateCustomIpData(data);
 
     store.set(ip, data);
     if (this.cache) this.cache.invalidate(ip);
@@ -335,8 +509,9 @@ export class GeoIP {
   ): Promise<void> {
     const store = await this.ensureCustomStore();
 
-    for (const { ip } of entries) {
+    for (const { ip, data } of entries) {
       if (!isValidIP(ip)) throw new InvalidIPError(ip);
+      validateCustomIpData(data);
     }
 
     store.setBulk(entries);
@@ -372,6 +547,30 @@ export class GeoIP {
     return this.customStore?.size ?? 0;
   }
 
+  get dbMetadata(): GeoIPMetadata {
+    const cityMeta = this.bundledReaders?.city?.metadata;
+    const asnMeta = this.bundledReaders?.asn?.metadata;
+
+    return {
+      city: cityMeta
+        ? {
+            buildEpoch: cityMeta.buildEpoch.getTime(),
+            databaseType: cityMeta.databaseType,
+            ipVersion: cityMeta.ipVersion,
+            description: cityMeta.description,
+          }
+        : null,
+      asn: asnMeta
+        ? {
+            buildEpoch: asnMeta.buildEpoch.getTime(),
+            databaseType: asnMeta.databaseType,
+            ipVersion: asnMeta.ipVersion,
+            description: asnMeta.description,
+          }
+        : null,
+    };
+  }
+
   // -----------------------------------------------------------------------
   // Cache management
   // -----------------------------------------------------------------------
@@ -389,6 +588,35 @@ export class GeoIP {
     return this.cache?.stats() ?? null;
   }
 
+  private startAutoUpdate(config: AutoUpdateConfig): void {
+    const intervalMs = config.intervalMs ?? 86_400_000;
+    const updateFn = async () => {
+      try {
+        const { updateDb } = await import("./updater");
+        await updateDb({
+          outputDir: this.userDataDir ?? BUNDLED_DATA_DIR,
+          lookbackMonths: config.lookbackMonths,
+        });
+        this.reload();
+        config.onUpdate?.();
+      } catch (err: any) {
+        if (config.onError) {
+          config.onError(err);
+        } else {
+          console.error("[mr-geopip] Auto-update failed:", err);
+        }
+      }
+    };
+
+    this.autoUpdateTimer = setInterval(() => {
+      updateFn().catch(() => {});
+    }, intervalMs);
+
+    if (this.autoUpdateTimer && typeof this.autoUpdateTimer.unref === "function") {
+      this.autoUpdateTimer.unref();
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
@@ -398,20 +626,33 @@ export class GeoIP {
    * Clears the cache automatically.
    */
   reload(): void {
-    this.bundledReaders = openReadersSync(
-      BUNDLED_DATA_DIR,
-      this.cityDbFile,
-      this.asnDbFile,
-      { required: true },
-    )!;
-
-    if (this.userDataDir) {
-      this.userReaders = openReadersSync(
-        this.userDataDir,
+    const fallbackEnabled = this.fallbackApiConfig?.enabled ?? false;
+    try {
+      this.bundledReaders = openReadersSync(
+        BUNDLED_DATA_DIR,
         this.cityDbFile,
         this.asnDbFile,
         { required: true },
       );
+    } catch (err) {
+      if (!fallbackEnabled) {
+        throw err;
+      }
+    }
+
+    if (this.userDataDir) {
+      try {
+        this.userReaders = openReadersSync(
+          this.userDataDir,
+          this.cityDbFile,
+          this.asnDbFile,
+          { required: true },
+        );
+      } catch (err) {
+        if (!fallbackEnabled) {
+          throw err;
+        }
+      }
     }
 
     this.cache?.clear();
@@ -422,6 +663,10 @@ export class GeoIP {
    * the cache. Call this when your process is shutting down.
    */
   async close(): Promise<void> {
+    if (this.autoUpdateTimer) {
+      clearInterval(this.autoUpdateTimer);
+      this.autoUpdateTimer = null;
+    }
     if (this.customStoreReady) {
       await this.customStoreReady;
     }

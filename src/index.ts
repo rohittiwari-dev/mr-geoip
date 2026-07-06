@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 // One-liner API
-export { lookup } from "./singleton";
+export { lookup, lookupAsync } from "./singleton";
 
 // Advanced API
 export { GeoIP } from "./GeoIP";
@@ -20,6 +20,10 @@ export type {
   CustomStoreConfig,
   UpdateConfig,
   LookupOptions,
+  LookupAsyncOptions,
+  AutoUpdateConfig,
+  FallbackApiConfig,
+  GeoIPMetadata,
 } from "./types";
 
 // Errors
@@ -33,7 +37,13 @@ export {
 } from "./errors";
 
 // Utilities
-export { isValidIP, isValidIPv4, isValidIPv6 } from "./validate";
+export {
+  isValidIP,
+  isValidIPv4,
+  isValidIPv6,
+  createCustomIpData,
+  validateCustomIpData,
+} from "./validate";
 
 // Updater
 export { updateDb } from "./updater";

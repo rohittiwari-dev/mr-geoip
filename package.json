@@ -69,7 +69,7 @@
     "test:watch": "vitest",
     "update:ipdb": "bun run scripts/update-ip-dbs.ts",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node dist/postinstall.js"
+    "postinstall": "node -e \"import('fs').then(fs => { if (fs.existsSync('./dist/postinstall.js')) { import('./dist/postinstall.js'); } })\""
   },
   "type": "module",
   "types": "./dist/index.d.ts",

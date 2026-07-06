@@ -1,47 +1,9 @@
 import { readFileSync, accessSync, constants } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { Reader, type CityResponse, type AsnResponse } from "mmdb-lib";
 import type { IpDetails } from "./types";
 import { DatabaseNotFoundError, DatabaseReadError } from "./errors";
-
-// ---------------------------------------------------------------------------
-// Bundled database path
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the directory of the current file in both ESM and CJS.
- *
- * - ESM: `import.meta.url` is available → convert to path
- * - CJS: tsup injects `__dirname` → use directly
- */
-function getCurrentDir(): string {
-  try {
-    // ESM path — import.meta.url is a file:// URL
-    if (import.meta.url) {
-      return dirname(fileURLToPath(import.meta.url));
-    }
-  } catch {
-    // CJS fallback
-  }
-  // CJS — __dirname is available natively
-  return __dirname;
-}
-
-/**
- * Absolute path to the MMDB databases bundled with the package.
- *
- * Resolves to `<package-root>/data/` regardless of whether code runs
- * from `src/` (dev) or `dist/` (production build).
- */
-export const BUNDLED_DATA_DIR = resolve(getCurrentDir(), "..", "data");
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_CITY_FILE = "GeoLite2-City.mmdb";
-export const DEFAULT_ASN_FILE = "GeoLite2-ASN.mmdb";
+import { BUNDLED_DATA_DIR, DEFAULT_CITY_FILE, DEFAULT_ASN_FILE } from "./paths";
 
 // ---------------------------------------------------------------------------
 // Reader handle

@@ -1,5 +1,5 @@
 import { updateDb } from "./updater";
-import { BUNDLED_DATA_DIR } from "./reader";
+import { BUNDLED_DATA_DIR } from "./paths";
 
 async function run() {
   const skip =

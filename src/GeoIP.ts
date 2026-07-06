@@ -13,15 +13,13 @@ import type {
 import { GeoIPCache } from "./cache";
 import { CustomDataStore } from "./custom-store";
 import {
-  BUNDLED_DATA_DIR,
-  DEFAULT_CITY_FILE,
-  DEFAULT_ASN_FILE,
   openReadersSync,
   performLookup,
   mergeResults,
   emptyIpDetails,
   type MmdbReaders,
 } from "./reader";
+import { BUNDLED_DATA_DIR, DEFAULT_CITY_FILE, DEFAULT_ASN_FILE } from "./paths";
 import { isValidIP, validateCustomIpData } from "./validate";
 import {
   InvalidIPError,

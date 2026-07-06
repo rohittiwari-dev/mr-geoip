@@ -7,7 +7,6 @@ import {
   isValidIP,
   isValidIPv4,
   isValidIPv6,
-  updateDb,
   InvalidIPError,
   GeoIPError,
 } from "./src/index";
@@ -51,25 +50,19 @@ console.log("isValidIP('not-an-ip'):", isValidIP("not-an-ip"));
 console.log("\n═══ 4. Advanced Instance ═══\n");
 
 const geo = GeoIP.create({
-  // dataDir: "./my-paid-dbs",              // uncomment if you have paid MaxMind DBs
-  cache: { maxSize: 10_000, ttlMs: 300_000 }, // 10K entries, 5min TTL
+  cache: { maxSize: 10_000, ttlMs: 300_000 },
   customStore: { filePath: "./custom-ips.json" },
-  traits: false, // omit traits by default (smaller payload)
-  // autoUpdate: {                          // uncomment to auto-check for DB updates
-  //   intervalMs: 86_400_000,
-  //   onUpdate: () => console.log("DB updated!"),
-  //   onError: (err) => console.error("Update failed:", err),
-  // },
-  // fallbackApi: { enabled: true },        // uncomment for HTTP fallback when DB missing
+  traits: false,
 });
 
 // ============================================================================
-// 5. CUSTOM DATA: VALIDATE → ASSOCIATE WITH IP → LOOKUP
+// 5. CUSTOM DATA: create → pass directly to set
 // ============================================================================
 console.log("═══ 5. Custom Data Overlay ═══\n");
 
-// Step A: Validate a single record
-const vpnServerData = createCustomIpData({
+// createCustomIpData validates IP + data, returns { ip, data }
+// → pass directly to setCustomData()
+const vpnEntry = createCustomIpData("10.0.0.1", {
   country: "Netherlands",
   countryCode: "NL",
   city: "Amsterdam",
@@ -81,35 +74,17 @@ const vpnServerData = createCustomIpData({
     isAnonymous: true,
   },
 });
+await geo.setCustomData(vpnEntry); // ← pass directly
 
-// Step B: Validate a batch of records
-const officeRecords = createCustomIpDataSet([
-  {
-    country: "India",
-    countryCode: "IN",
-    city: "Bangalore",
-    organization: "HQ Office",
-    euMember: false,
-  },
-  {
-    country: "United States",
-    countryCode: "US",
-    city: "San Francisco",
-    organization: "US Branch",
-    euMember: false,
-  },
+// createCustomIpDataSet validates a batch, returns [{ ip, data }, ...]
+// → pass directly to setCustomDataBulk()
+const officeEntries = createCustomIpDataSet([
+  { ip: "192.168.1.100", data: { country: "India", countryCode: "IN", city: "Bangalore", organization: "HQ Office", euMember: false } },
+  { ip: "192.168.1.200", data: { country: "United States", countryCode: "US", city: "San Francisco", organization: "US Branch", euMember: false } },
 ]);
+await geo.setCustomDataBulk(officeEntries); // ← pass directly
 
-// Step C: Associate validated data WITH specific IPs
-await geo.setCustomData("10.0.0.1", vpnServerData);
-
-// Step D: Bulk association — each record maps to an IP
-await geo.setCustomDataBulk([
-  { ip: "192.168.1.100", data: officeRecords[0] },
-  { ip: "192.168.1.200", data: officeRecords[1] },
-]);
-
-// Step E: Lookup — custom data overlays on top of MMDB results
+// Lookup — custom data overlays on top of MMDB results
 console.log("VPN Server (10.0.0.1):");
 const vpnResult = geo.lookup("10.0.0.1", { traits: true });
 console.log("  →", vpnResult.organization, vpnResult.city, vpnResult.traits?.isAnonymousVpn);
@@ -122,7 +97,7 @@ console.log("US Branch (192.168.1.200):");
 const usResult = geo.lookup("192.168.1.200");
 console.log("  →", usResult.organization, usResult.city, usResult.countryCode);
 
-// Step F: Check and remove
+// Check and remove
 console.log("\nHas custom data for 10.0.0.1?", geo.hasCustomData("10.0.0.1"));
 console.log("Custom data entries:", geo.customDataSize);
 
@@ -134,7 +109,6 @@ console.log("After removal, has 10.0.0.1?", geo.hasCustomData("10.0.0.1"));
 // ============================================================================
 console.log("\n═══ 6. Cache Stats ═══\n");
 
-// Trigger some lookups to populate cache
 geo.lookup("8.8.8.8");
 geo.lookup("1.1.1.1");
 geo.lookup("8.8.8.8"); // cache hit
@@ -163,7 +137,7 @@ if (meta.asn) {
 // ============================================================================
 console.log("\n═══ 8. Hot Reload ═══\n");
 
-geo.reload(); // re-reads MMDB files from disk, clears cache
+geo.reload();
 console.log("Reloaded. Cache size after reload:", geo.cacheStats()!.size);
 
 // ============================================================================
@@ -187,7 +161,7 @@ try {
 // ============================================================================
 console.log("\n═══ 10. Graceful Shutdown ═══\n");
 
-await geo.close(); // stops auto-update timers, flushes custom store, clears cache
+await geo.close();
 console.log("Instance closed gracefully.");
 
 console.log("\n═══ All features demonstrated! ═══");

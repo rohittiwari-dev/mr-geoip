@@ -1,5 +1,6 @@
 import { isIP as netIsIP } from "node:net";
-import type { CustomIpData } from "./types";
+import type { CustomIpData, CustomIpEntry } from "./types";
+import { InvalidIPError } from "./errors";
 
 /**
  * Returns `true` when `ip` is a valid IPv4 or IPv6 address.
@@ -112,19 +113,44 @@ export function validateCustomIpData(
 }
 
 /**
- * Creates a validated CustomIpData object.
- * Useful helper function for users to ensure their custom records are properly structured.
+ * Validates and creates a single `CustomIpEntry`.
+ *
+ * The returned object can be passed directly to `geo.setCustomData()`.
+ *
+ * @throws {InvalidIPError} if `ip` is not a valid IPv4/IPv6 string.
+ * @throws {TypeError} if `data` has invalid field types.
+ *
+ * @example
+ * ```ts
+ * const entry = createCustomIpData("10.0.0.1", { country: "Internal" });
+ * await geo.setCustomData(entry);
+ * ```
  */
-export function createCustomIpData(data: CustomIpData): CustomIpData {
+export function createCustomIpData(ip: string, data: CustomIpData): CustomIpEntry {
+  if (!isValidIP(ip)) throw new InvalidIPError(ip);
   validateCustomIpData(data);
-  return data;
+  return { ip, data };
 }
 
 /**
- * Creates a validated CustomIpData object.
- * Useful helper function for users to ensure their custom records are properly structured.
+ * Validates and creates a batch of `CustomIpEntry` objects.
+ *
+ * The returned array can be passed directly to `geo.setCustomDataBulk()`.
+ *
+ * @throws {InvalidIPError} if any IP is invalid (fails fast).
+ * @throws {TypeError} if any data has invalid field types.
+ *
+ * @example
+ * ```ts
+ * const entries = createCustomIpDataSet([
+ *   { ip: "10.0.0.1", data: { country: "Internal" } },
+ *   { ip: "10.0.0.2", data: { organization: "Branch" } },
+ * ]);
+ * await geo.setCustomDataBulk(entries);
+ * ```
  */
-export function createCustomIpDataSet(data: CustomIpData[]): CustomIpData[] {
-  data.forEach((item) => validateCustomIpData(item));
-  return data;
+export function createCustomIpDataSet(
+  entries: ReadonlyArray<{ ip: string; data: CustomIpData }>,
+): CustomIpEntry[] {
+  return entries.map(({ ip, data }) => createCustomIpData(ip, data));
 }

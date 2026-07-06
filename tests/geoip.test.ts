@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
-import { lookup, lookupAsync, createCustomIpData } from "../src/index";
+import { lookup, lookupAsync, createCustomIpData, createCustomIpDataSet } from "../src/index";
 import { GeoIP } from "../src/GeoIP";
 import {
   InvalidIPError,
@@ -343,45 +343,74 @@ describe("GeoIP", () => {
   // =========================================================================
 
   describe("Custom Data Validation", () => {
-    it("createCustomIpData validates structure correctly", () => {
-      // Valid data should pass
-      const valid = createCustomIpData({
+    it("createCustomIpData validates IP and data, returns CustomIpEntry", () => {
+      const entry = createCustomIpData("10.0.0.1", {
         country: "USA",
         coordinates: { latitude: 37.7, longitude: -122.4 },
-        traits: { isAnonymous: true } as any,
       });
-      expect(valid.country).toBe("USA");
+      // Returns { ip, data } — ready to pass to setCustomData
+      expect(entry.ip).toBe("10.0.0.1");
+      expect(entry.data.country).toBe("USA");
+    });
 
-      // Invalid coordinates type
+    it("createCustomIpData rejects invalid IP", () => {
       expect(() =>
-        createCustomIpData({
-          coordinates: { latitude: "bad" } as any,
-        }),
+        createCustomIpData("not-ip", { country: "X" }),
+      ).toThrow(InvalidIPError);
+    });
+
+    it("createCustomIpData rejects invalid data types", () => {
+      expect(() =>
+        createCustomIpData("10.0.0.1", { country: 123 as any }),
       ).toThrow(TypeError);
 
-      // Invalid traits type
       expect(() =>
-        createCustomIpData({
-          traits: "bad" as any,
-        }),
+        createCustomIpData("10.0.0.1", { coordinates: { latitude: "bad" } as any }),
       ).toThrow(TypeError);
 
-      // Invalid trait flag type
       expect(() =>
-        createCustomIpData({
-          traits: { isAnonymous: "yes" } as any,
-        }),
-      ).toThrow(TypeError);
-
-      // Invalid property type (number passed to string field)
-      expect(() =>
-        createCustomIpData({
-          country: 123 as any,
-        }),
+        createCustomIpData("10.0.0.1", { traits: "bad" as any }),
       ).toThrow(TypeError);
     });
 
-    it("GeoIP.setCustomData automatically validates the payload", async () => {
+    it("createCustomIpDataSet validates a batch and returns entries", () => {
+      const entries = createCustomIpDataSet([
+        { ip: "10.0.0.1", data: { country: "A" } },
+        { ip: "10.0.0.2", data: { country: "B" } },
+      ]);
+      expect(entries).toHaveLength(2);
+      expect(entries[0].ip).toBe("10.0.0.1");
+      expect(entries[1].data.country).toBe("B");
+    });
+
+    it("setCustomData accepts a CustomIpEntry directly", async () => {
+      const geo = GeoIP.create({ customStore: { filePath: CUSTOM_FILE } });
+
+      const entry = createCustomIpData("10.0.0.1", { organization: "Direct" });
+      await geo.setCustomData(entry); // pass directly
+
+      const result = geo.lookup("10.0.0.1");
+      expect(result.organization).toBe("Direct");
+
+      await geo.close();
+    });
+
+    it("setCustomDataBulk accepts createCustomIpDataSet output directly", async () => {
+      const geo = GeoIP.create({ customStore: { filePath: CUSTOM_FILE } });
+
+      const entries = createCustomIpDataSet([
+        { ip: "10.0.0.1", data: { organization: "A" } },
+        { ip: "10.0.0.2", data: { organization: "B" } },
+      ]);
+      await geo.setCustomDataBulk(entries); // pass directly
+
+      expect(geo.lookup("10.0.0.1").organization).toBe("A");
+      expect(geo.lookup("10.0.0.2").organization).toBe("B");
+
+      await geo.close();
+    });
+
+    it("GeoIP.setCustomData still validates the payload inline", async () => {
       const geo = GeoIP.create({ customStore: { filePath: CUSTOM_FILE } });
 
       await expect(

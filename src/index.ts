@@ -14,6 +14,7 @@ export type {
   Coordinates,
   IpTraits,
   CustomIpData,
+  CustomIpEntry,
   GeoIPConfig,
   CacheConfig,
   CacheStats,

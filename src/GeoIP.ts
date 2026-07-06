@@ -1,6 +1,7 @@
 import type {
   CacheStats,
   CustomIpData,
+  CustomIpEntry,
   GeoIPConfig,
   IpDetails,
   LookupOptions,
@@ -486,11 +487,31 @@ export class GeoIP {
   /**
    * Attach custom metadata to a specific IP address.
    *
+   * Accepts either `(ip, data)` or a `CustomIpEntry` object (as returned
+   * by `createCustomIpData()`).
+   *
    * @throws {CustomStoreNotConfiguredError} if no `customStore` was provided.
    * @throws {InvalidIPError} if `ip` is not a valid IP address.
    */
-  async setCustomData(ip: string, data: CustomIpData): Promise<void> {
+  async setCustomData(entry: CustomIpEntry): Promise<void>;
+  async setCustomData(ip: string, data: CustomIpData): Promise<void>;
+  async setCustomData(
+    ipOrEntry: string | CustomIpEntry,
+    maybeData?: CustomIpData,
+  ): Promise<void> {
     const store = await this.ensureCustomStore();
+
+    let ip: string;
+    let data: CustomIpData;
+
+    if (typeof ipOrEntry === "string") {
+      ip = ipOrEntry;
+      data = maybeData!;
+    } else {
+      ip = ipOrEntry.ip;
+      data = ipOrEntry.data;
+    }
+
     if (!isValidIP(ip)) throw new InvalidIPError(ip);
     validateCustomIpData(data);
 

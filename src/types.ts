@@ -10,16 +10,16 @@ export interface Coordinates {
  * IP anonymity and proxy traits/flags.
  */
 export interface IpTraits {
-  isAnonymous: boolean;
-  isAnonymousProxy: boolean;
-  isAnonymousVpn: boolean;
-  isHostingProvider: boolean;
-  isLegitimateProxy: boolean;
-  isPublicProxy: boolean;
-  isResidentialProxy: boolean;
-  isSatelliteProvider: boolean;
-  isTorExitNode: boolean;
-  isAnycast: boolean;
+  isAnonymous?: boolean;
+  isAnonymousProxy?: boolean;
+  isAnonymousVpn?: boolean;
+  isHostingProvider?: boolean;
+  isLegitimateProxy?: boolean;
+  isPublicProxy?: boolean;
+  isResidentialProxy?: boolean;
+  isSatelliteProvider?: boolean;
+  isTorExitNode?: boolean;
+  isAnycast?: boolean;
 }
 
 /**
@@ -97,6 +97,17 @@ export interface LookupAsyncOptions extends LookupOptions {
  * override the corresponding MMDB values during lookup.
  */
 export type CustomIpData = Partial<Omit<IpDetails, "ip">>;
+
+/**
+ * An IP address paired with its custom data.
+ *
+ * Returned by `createCustomIpData()` / `createCustomIpDataSet()` and
+ * accepted directly by `setCustomData()` / `setCustomDataBulk()`.
+ */
+export interface CustomIpEntry {
+  ip: string;
+  data: CustomIpData;
+}
 
 // ---------------------------------------------------------------------------
 // Configuration

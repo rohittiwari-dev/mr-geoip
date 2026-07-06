@@ -69,6 +69,35 @@ const details = await lookupSafeAsync("8.8.8.8");
 
 ---
 
+## Offline Databases & CLI
+
+By default, `mr-geoip` downloads the free GeoLite2 City and ASN databases automatically during installation so that your lookups run 100% offline at sub-millisecond speeds.
+
+Using the offline database **completely avoids the rate limits** associated with public HTTP lookup fallbacks (which are restricted to 1,000 requests/day).
+
+### Downloading & Updating the Offline Databases
+If the postinstall download was skipped (e.g. in firewalled or CI environments using the `MR_GEOPIP_SKIP_DOWNLOAD=true` flag), or if you want to update to the latest database release, run the following CLI command:
+
+```bash
+npx mr-geoip-update
+```
+
+### CLI Command Options
+Customize the update behavior with arguments:
+
+```bash
+# Save databases to a custom folder instead of the default package bundle location
+npx mr-geoip-update --output-dir=./custom-data-dir
+
+# Fetch databases from a custom mirror or private MaxMind URL
+npx mr-geoip-update --city-url="<city-db-url>" --asn-url="<asn-db-url>"
+
+# Verify connection and configuration without downloading files
+npx mr-geoip-update --dry-run
+```
+
+---
+
 ## Detailed Documentation
 
 For advanced setup, check out the full [DOCUMENTATION.md](file:///d:/development/mr-geopip/DOCUMENTATION.md) file:

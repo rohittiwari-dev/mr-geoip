@@ -20,22 +20,22 @@ bun add mr-geopip
 ## Quick Start
 
 ```ts
-import { lookup } from "mr-geopip";
+import { lookup, lookupAsync } from "mr-geopip";
 
+// Synchronous lookup (uses local MMDB)
 const info = lookup("8.8.8.8");
 console.log(info.country);      // "United States"
-console.log(info.countryCode);  // "US"
-console.log(info.coordinates);  // { latitude: 37.751, longitude: -97.822 }
-console.log(info.asn);          // 15169
-console.log(info.organization); // "Google LLC"
-console.log(info.network);     // "8.8.8.0/24"
+
+// Asynchronous lookup (with optional HTTP API fallback if local DB is missing)
+const infoAsync = await lookupAsync("8.8.8.8");
+console.log(infoAsync.country); // "United States"
 ```
 
-That's it. No `.create()`, no `await`, no config files.
+That's it. No `.create()`, no `await` (unless using async fallback lookup), no config files.
 
 ## What You Get
 
-Every `lookup()` returns a fully-typed `IpDetails` object:
+Every `lookup()` or `lookupAsync()` returns a fully-typed `IpDetails` object:
 
 ```ts
 interface IpDetails {
@@ -48,13 +48,13 @@ interface IpDetails {
   continentCode: string | null;
   city: string | null;
   postalCode: string | null;
-  euMember: boolean | null;
+  euMember: boolean;               // strictly true/false
   timezone: string | null;
   coordinates: { latitude: number; longitude: number } | null;
   asn: number | null;
   organization: string | null;
   network: string | null;          // CIDR notation
-  traits: IpTraits | null;         // VPN, proxy, Tor, etc.
+  traits?: IpTraits;               // VPN, proxy, Tor, etc. (Omitted by default)
 }
 ```
 
@@ -69,6 +69,14 @@ const geo = GeoIP.create({
   dataDir: "./my-paid-maxmind-dbs",   // your DBs merged over bundled
   cache: { maxSize: 50_000, ttlMs: 300_000 },
   customStore: { filePath: "./custom-ips.json" },
+  traits: false,                      // omit traits to keep payload small (default)
+  autoUpdate: {
+    intervalMs: 86_400_000,          // auto-check for updates every 24 hours
+    onUpdate: () => console.log("Database updated and reloaded!"),
+  },
+  fallbackApi: {
+    enabled: true,                   // fall back to public API if MMDB is missing
+  }
 });
 
 const info = geo.lookup("8.8.8.8");
@@ -88,43 +96,51 @@ interface GeoIPConfig {
   cache?: { maxSize?: number; ttlMs?: number } | false;
   /** JSON-backed custom data persistence. */
   customStore?: { filePath: string; flushIntervalMs?: number };
+  /** Whether to include the traits object in results. @default false */
+  traits?: boolean;
+  /** Background auto-update options. */
+  autoUpdate?: AutoUpdateConfig;
+  /** Public HTTP API fallback options if local databases do not exist. */
+  fallbackApi?: FallbackApiConfig;
 }
 ```
 
-## Custom Data Overlay
+## Custom Data Validation & Concurrency Safety
 
-Attach your own metadata to any IP. Custom data overrides MMDB values on lookup:
+### Validation
+Ensure custom IP details are safe and properly structured using the `createCustomIpData` helper:
 
 ```ts
-const geo = GeoIP.create({
-  customStore: { filePath: "./custom-ips.json" },
+import { createCustomIpData } from "mr-geopip";
+
+// Validates keys and types at runtime before writing to custom store
+const customRecord = createCustomIpData({
+  country: "Internal Cloud",
+  coordinates: { latitude: 37.75, longitude: -97.82 }
 });
 
-// Attach custom data (persisted to disk as JSON)
-await geo.setCustomData("10.0.0.1", {
-  country: "Internal",
-  organization: "HQ",
-  city: "Private Cloud",
-});
+await geo.setCustomData("10.0.0.1", customRecord);
+```
 
-const info = geo.lookup("10.0.0.1");
-console.log(info.organization); // "HQ"
+### Concurrency Safety (Advisory Locking)
+`CustomDataStore` implements a **runtime-agnostic advisory file lock** using atomic `mkdir` checks.
+If multiple worker processes try to update the custom store concurrently (e.g. in cluster mode), the writes are queue-safe and retry automatically, preventing file truncation or data loss.
 
-// Bulk set
-await geo.setCustomDataBulk([
-  { ip: "10.0.0.2", data: { organization: "Branch A" } },
-  { ip: "10.0.0.3", data: { organization: "Branch B" } },
-]);
+## Database Metadata Inspection
 
-// Remove
-await geo.removeCustomData("10.0.0.1");
+Check database compiler dates and versions directly from the MMDB headers:
+
+```ts
+const meta = geo.dbMetadata;
+console.log(meta.city?.buildEpoch);    // timestamp of City DB compilation
+console.log(meta.city?.databaseType);  // e.g. "GeoLite2-City"
 ```
 
 ## User Database Merge
 
 When you provide your own MMDB databases (e.g. paid MaxMind GeoIP2), the library merges results:
 
-1. **Your DB** is queried first (higher accuracy)
+1. **Your DB** is queried first (highest priority)
 2. **Bundled DB** fills in any `null` gaps (free GeoLite2 fallback)
 3. **Custom data** overlays on top (highest priority)
 
@@ -179,7 +195,7 @@ await updateDb({ outputDir: "./data" });
 bun run update:ipdb
 
 # Options
-bun run update:ipdb --months=18 --output-dir=data
+bun run update:ipdb --output-dir=data
 bun run update:ipdb --city-url=https://example.com/city.mmdb --asn-url=https://example.com/asn.mmdb
 bun run update:ipdb --dry-run
 ```
@@ -187,7 +203,7 @@ bun run update:ipdb --dry-run
 ## Lifecycle
 
 ```ts
-// Graceful shutdown — flushes custom data store, clears cache
+// Graceful shutdown — stops auto-update timers, flushes custom store, clears cache
 await geo.close();
 ```
 
@@ -240,6 +256,9 @@ try {
 | Custom data overlay | ❌ | ✅ |
 | User DB merge | ❌ | ✅ |
 | Hot reload | ❌ | ✅ |
+| Concurrency locks | ❌ | ✅ |
+| Background Auto-updater | ❌ | ✅ |
+| HTTP API Fallback | ❌ | ✅ |
 | Structured errors | ❌ | ✅ |
 
 ## License

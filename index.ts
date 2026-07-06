@@ -14,7 +14,7 @@ import {
   updateDb,
 } from "./src/index";
 
-await updateDb();
+// await updateDb();
 
 // ============================================================================
 // 1. ZERO-CONFIG ONE-LINER (simplest use-case)
@@ -50,8 +50,14 @@ console.log("Async result:", asyncResult.country, asyncResult.coordinates);
 console.log("\n═══ 2.5 Safe Geolocation APIs ═══\n");
 
 console.log("lookupSafe('8.8.8.8') [Valid]:", lookupSafe("8.8.8.8")?.country);
-console.log("lookupSafe('invalid-ip') [Invalid -> null]:", lookupSafe("invalid-ip"));
-console.log("lookupSafe('127.0.0.1') [Unmapped loopback -> null]:", lookupSafe("127.0.0.1"));
+console.log(
+  "lookupSafe('invalid-ip') [Invalid -> null]:",
+  lookupSafe("invalid-ip"),
+);
+console.log(
+  "lookupSafe('127.0.0.1') [Unmapped loopback -> null]:",
+  lookupSafe("127.0.0.1"),
+);
 
 const safeAsyncResult = await lookupSafeAsync("8.8.8.8");
 console.log("lookupSafeAsync('8.8.8.8') [Valid]:", safeAsyncResult?.country);

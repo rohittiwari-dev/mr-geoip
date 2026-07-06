@@ -311,7 +311,7 @@ export class GeoIP {
     }
 
     // 5. Populate cache (always with full result)
-    if (this.cache) {
+    if (this.cache && this.bundledReaders) {
       this.cache.set(ip, result);
     }
 
@@ -391,7 +391,7 @@ export class GeoIP {
     }
 
     // 5. Populate cache (always with full result)
-    if (this.cache && !bypassCache) {
+    if (this.cache && !bypassCache && (this.bundledReaders || result.country || result.asn)) {
       this.cache.set(ip, result);
     }
 

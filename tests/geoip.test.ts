@@ -447,9 +447,10 @@ describe("GeoIP", () => {
         in_eu: true,
       };
 
+      let capturedUrl: string | null = null;
       const originalFetch = globalThis.fetch;
       globalThis.fetch = async (url: any) => {
-        expect(url).toContain("8.8.8.8");
+        capturedUrl = String(url);
         return {
           ok: true,
           json: async () => mockResult,
@@ -467,6 +468,7 @@ describe("GeoIP", () => {
 
         const result = await geo.lookupAsync("8.8.8.8");
 
+        expect(capturedUrl).toContain("8.8.8.8");
         expect(result.country).toBe("Mockland");
         expect(result.countryCode).toBe("ML");
         expect(result.city).toBe("Mock City");

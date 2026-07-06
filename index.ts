@@ -1,6 +1,8 @@
 import {
   lookup,
   lookupAsync,
+  lookupSafe,
+  lookupSafeAsync,
   GeoIP,
   createCustomIpData,
   createCustomIpDataSet,
@@ -9,7 +11,10 @@ import {
   isValidIPv6,
   InvalidIPError,
   GeoIPError,
+  updateDb,
 } from "./src/index";
+
+await updateDb();
 
 // ============================================================================
 // 1. ZERO-CONFIG ONE-LINER (simplest use-case)
@@ -20,7 +25,12 @@ const google = lookup("8.8.8.8");
 console.log("Google DNS:", google.country, google.countryCode, google.asn);
 
 const cloudflare = lookup("1.1.1.1");
-console.log("Cloudflare:", cloudflare.country, cloudflare.asn, cloudflare.organization);
+console.log(
+  "Cloudflare:",
+  cloudflare.country,
+  cloudflare.asn,
+  cloudflare.organization,
+);
 
 // With traits enabled per-call
 const withTraits = lookup("8.8.8.8", { traits: true });
@@ -33,6 +43,18 @@ console.log("\n═══ 2. Async Lookup ═══\n");
 
 const asyncResult = await lookupAsync("8.8.8.8");
 console.log("Async result:", asyncResult.country, asyncResult.coordinates);
+
+// ============================================================================
+// 2.5 SAFE GEOLOCATION APIS (returns null on invalid/unmapped IPs instead of throwing)
+// ============================================================================
+console.log("\n═══ 2.5 Safe Geolocation APIs ═══\n");
+
+console.log("lookupSafe('8.8.8.8') [Valid]:", lookupSafe("8.8.8.8")?.country);
+console.log("lookupSafe('invalid-ip') [Invalid -> null]:", lookupSafe("invalid-ip"));
+console.log("lookupSafe('127.0.0.1') [Unmapped loopback -> null]:", lookupSafe("127.0.0.1"));
+
+const safeAsyncResult = await lookupSafeAsync("8.8.8.8");
+console.log("lookupSafeAsync('8.8.8.8') [Valid]:", safeAsyncResult?.country);
 
 // ============================================================================
 // 3. IP VALIDATION UTILITIES
@@ -79,15 +101,38 @@ await geo.setCustomData(vpnEntry); // ← pass directly
 // createCustomIpDataSet validates a batch, returns [{ ip, data }, ...]
 // → pass directly to setCustomDataBulk()
 const officeEntries = createCustomIpDataSet([
-  { ip: "192.168.1.100", data: { country: "India", countryCode: "IN", city: "Bangalore", organization: "HQ Office", euMember: false } },
-  { ip: "192.168.1.200", data: { country: "United States", countryCode: "US", city: "San Francisco", organization: "US Branch", euMember: false } },
+  {
+    ip: "192.168.1.100",
+    data: {
+      country: "India",
+      countryCode: "IN",
+      city: "Bangalore",
+      organization: "HQ Office",
+      euMember: false,
+    },
+  },
+  {
+    ip: "192.168.1.200",
+    data: {
+      country: "United States",
+      countryCode: "US",
+      city: "San Francisco",
+      organization: "US Branch",
+      euMember: false,
+    },
+  },
 ]);
 await geo.setCustomDataBulk(officeEntries); // ← pass directly
 
 // Lookup — custom data overlays on top of MMDB results
 console.log("VPN Server (10.0.0.1):");
 const vpnResult = geo.lookup("10.0.0.1", { traits: true });
-console.log("  →", vpnResult.organization, vpnResult.city, vpnResult.traits?.isAnonymousVpn);
+console.log(
+  "  →",
+  vpnResult.organization,
+  vpnResult.city,
+  vpnResult.traits?.isAnonymousVpn,
+);
 
 console.log("HQ Office (192.168.1.100):");
 const hqResult = geo.lookup("192.168.1.100");
@@ -114,7 +159,9 @@ geo.lookup("1.1.1.1");
 geo.lookup("8.8.8.8"); // cache hit
 
 const stats = geo.cacheStats()!;
-console.log(`Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+console.log(
+  `Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${(stats.hitRate * 100).toFixed(1)}%`,
+);
 
 geo.clearCache();
 console.log("Cache cleared. Size:", geo.cacheStats()!.size);
@@ -126,10 +173,20 @@ console.log("\n═══ 7. Database Metadata ═══\n");
 
 const meta = geo.dbMetadata;
 if (meta.city) {
-  console.log("City DB:", meta.city.databaseType, "| Built:", new Date(meta.city.buildEpoch).toISOString());
+  console.log(
+    "City DB:",
+    meta.city.databaseType,
+    "| Built:",
+    new Date(meta.city.buildEpoch).toISOString(),
+  );
 }
 if (meta.asn) {
-  console.log("ASN DB:", meta.asn.databaseType, "| Built:", new Date(meta.asn.buildEpoch).toISOString());
+  console.log(
+    "ASN DB:",
+    meta.asn.databaseType,
+    "| Built:",
+    new Date(meta.asn.buildEpoch).toISOString(),
+  );
 }
 
 // ============================================================================

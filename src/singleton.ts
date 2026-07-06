@@ -9,7 +9,9 @@ let instance: GeoIP | null = null;
 
 function getDefault(): GeoIP {
   if (!instance) {
-    instance = GeoIP.create();
+    instance = GeoIP.create({
+      fallbackApi: { enabled: true },
+    });
   }
   return instance;
 }
@@ -52,4 +54,42 @@ export function lookup(ip: string, options?: LookupOptions): IpDetails {
  */
 export async function lookupAsync(ip: string, options?: LookupAsyncOptions): Promise<IpDetails> {
   return getDefault().lookupAsync(ip, options);
+}
+
+/**
+ * Safe version of `lookup(ip)`.
+ *
+ * - Returns `null` if the IP address is invalid (instead of throwing `InvalidIPError`).
+ * - Returns `null` if no geolocation or ASN data is resolved (e.g. for loopback/private ranges).
+ *
+ * @example
+ * ```ts
+ * import { lookupSafe } from "mr-geopip";
+ *
+ * const info = lookupSafe("invalid-ip"); // null
+ * const localInfo = lookupSafe("127.0.0.1"); // null
+ * ```
+ */
+export function lookupSafe(ip: string, options?: LookupOptions): IpDetails | null {
+  return getDefault().lookupSafe(ip, options);
+}
+
+/**
+ * Safe version of `lookupAsync(ip)`.
+ *
+ * - Returns `null` if the IP address is invalid.
+ * - Returns `null` if no geolocation or ASN data is resolved.
+ *
+ * @example
+ * ```ts
+ * import { lookupSafeAsync } from "mr-geopip";
+ *
+ * const info = await lookupSafeAsync("127.0.0.1"); // null
+ * ```
+ */
+export async function lookupSafeAsync(
+  ip: string,
+  options?: LookupAsyncOptions,
+): Promise<IpDetails | null> {
+  return getDefault().lookupSafeAsync(ip, options);
 }

@@ -23,12 +23,14 @@
     }
   },
   "description": "Production-grade, framework-agnostic IP geolocation with LRU caching and custom data persistence.",
+  "bin": {
+    "mr-geopip-update": "./dist/cli.js"
+  },
   "engines": {
     "node": ">=18"
   },
   "files": [
     "dist",
-    "data",
     "README.md"
   ],
   "keywords": [
@@ -47,7 +49,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "update:ipdb": "bun run scripts/update-ip-dbs.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node dist/postinstall.js"
   },
   "type": "module",
   "types": "./dist/index.d.ts",

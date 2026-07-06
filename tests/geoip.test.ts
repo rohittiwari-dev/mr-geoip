@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
-import { lookup, lookupAsync, createCustomIpData, createCustomIpDataSet } from "../src/index";
+import { lookup, lookupAsync, lookupSafe, lookupSafeAsync, createCustomIpData, createCustomIpDataSet } from "../src/index";
 import { GeoIP } from "../src/GeoIP";
 import {
   InvalidIPError,
@@ -517,6 +517,112 @@ describe("GeoIP", () => {
       const result = await lookupAsync("8.8.8.8");
       expect(result.ip).toBe("8.8.8.8");
       expect(result.countryCode).toBe("US");
+    });
+
+    it("lookupSafe returns null for invalid or unmapped IPs", () => {
+      // Invalid IP -> null
+      expect(lookupSafe("not-an-ip")).toBeNull();
+
+      // Unmapped loopback IP -> null (since no location data exists)
+      expect(lookupSafe("127.0.0.1")).toBeNull();
+
+      // Valid IP -> succeeds
+      const result = lookupSafe("8.8.8.8");
+      expect(result).not.toBeNull();
+      expect(result!.countryCode).toBe("US");
+    });
+
+    it("lookupSafeAsync returns null for invalid or unmapped IPs", async () => {
+      // Invalid IP -> null
+      expect(await lookupSafeAsync("not-an-ip")).toBeNull();
+
+      // Unmapped loopback IP -> null
+      expect(await lookupSafeAsync("127.0.0.1")).toBeNull();
+
+      // Valid IP -> succeeds
+      const result = await lookupSafeAsync("8.8.8.8");
+      expect(result).not.toBeNull();
+      expect(result!.countryCode).toBe("US");
+    });
+
+    it("falls back to ipapi.co when FreeIPAPI.com fails (Multi-Tier chain)", async () => {
+      const mockIpapiResult = {
+        country_name: "Fallbackland",
+        country_code: "FB",
+        city: "Fallback City",
+      };
+
+      const originalFetch = globalThis.fetch;
+      const requestedUrls: string[] = [];
+
+      globalThis.fetch = (async (url: any) => {
+        const urlStr = String(url);
+        requestedUrls.push(urlStr);
+
+        if (urlStr.includes("freeipapi.com")) {
+          // Tier 1 fails
+          return {
+            ok: false,
+            status: 500,
+          } as any;
+        }
+
+        // Tier 2 succeeds
+        return {
+          ok: true,
+          json: async () => mockIpapiResult,
+        } as any;
+      }) as any;
+
+      try {
+        const geo = GeoIP.create({
+          fallbackApi: { enabled: true },
+        });
+
+        // Force fallback
+        (geo as any).bundledReaders = null;
+        (geo as any).userReaders = null;
+
+        const result = await geo.lookupAsync("8.8.8.8");
+
+        expect(requestedUrls).toHaveLength(2);
+        expect(requestedUrls[0]).toContain("freeipapi.com");
+        expect(requestedUrls[1]).toContain("ipapi.co");
+        expect(result.country).toBe("Fallbackland");
+        expect(result.countryCode).toBe("FB");
+
+        await geo.close();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("returns empty details if all HTTP APIs in the chain fail", async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async (url: any) => {
+        return {
+          ok: false,
+          status: 500,
+        } as any;
+      }) as any;
+
+      try {
+        const geo = GeoIP.create({
+          fallbackApi: { enabled: true },
+        });
+
+        (geo as any).bundledReaders = null;
+        (geo as any).userReaders = null;
+
+        // Falls back to empty details on complete failure
+        const result = await geo.lookupAsync("8.8.8.8");
+        expect(result.ip).toBe("8.8.8.8");
+        expect(result.country).toBeNull();
+
+        await geo.close();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 });

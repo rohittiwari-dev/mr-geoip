@@ -252,6 +252,10 @@ export interface AutoUpdateConfig {
   intervalMs?: number;
   /** Lookup window for updates. */
   lookbackMonths?: number;
+  /** Optional custom download URL for the City database. */
+  cityUrl?: string;
+  /** Optional custom download URL for the ASN database. */
+  asnUrl?: string;
   /** Optional callback fired when the database has successfully updated and reloaded. */
   onUpdate?: () => void;
   /** Optional callback fired if an update fails. */

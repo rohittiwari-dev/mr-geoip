@@ -403,11 +403,74 @@ export class GeoIP {
     return result;
   }
 
-  private async queryFallbackApi(ip: string): Promise<IpDetails> {
-    const urlTemplate = this.fallbackApiConfig?.urlTemplate ?? "https://ipapi.co/{ip}/json/";
-    const timeoutMs = this.fallbackApiConfig?.timeoutMs ?? 5000;
-    const url = urlTemplate.replace("{ip}", ip);
+  /**
+   * Safe version of `lookup(ip)`.
+   *
+   * - Returns `null` if the IP address is invalid (instead of throwing `InvalidIPError`).
+   * - Returns `null` if no geolocation or ASN data is resolved (e.g. for loopback or private ranges).
+   */
+  lookupSafe(ip: string, options?: LookupOptions): IpDetails | null {
+    if (!isValidIP(ip)) return null;
+    try {
+      const res = this.lookup(ip, options);
+      if (!res.country && !res.asn && !res.city && !res.organization) {
+        return null;
+      }
+      return res;
+    } catch {
+      return null;
+    }
+  }
 
+  /**
+   * Safe version of `lookupAsync(ip)`.
+   *
+   * - Returns `null` if the IP address is invalid (instead of throwing `InvalidIPError`).
+   * - Returns `null` if no geolocation or ASN data is resolved.
+   */
+  async lookupSafeAsync(ip: string, options?: LookupAsyncOptions): Promise<IpDetails | null> {
+    if (!isValidIP(ip)) return null;
+    try {
+      const res = await this.lookupAsync(ip, options);
+      if (!res.country && !res.asn && !res.city && !res.organization) {
+        return null;
+      }
+      return res;
+    } catch {
+      return null;
+    }
+  }
+
+  private async queryFallbackApi(ip: string): Promise<IpDetails> {
+    const customTemplate = this.fallbackApiConfig?.urlTemplate;
+    const timeoutMs = this.fallbackApiConfig?.timeoutMs ?? 3000;
+
+    if (customTemplate) {
+      return this.querySingleUrl(ip, customTemplate, timeoutMs);
+    }
+
+    const chain = [
+      "https://freeipapi.com/api/json/{ip}",
+      "https://ipapi.co/{ip}/json/",
+    ];
+
+    const errors: Error[] = [];
+    for (const template of chain) {
+      try {
+        const res = await this.querySingleUrl(ip, template, timeoutMs);
+        if (res.country || res.asn || res.city) {
+          return res;
+        }
+      } catch (err: any) {
+        errors.push(err);
+      }
+    }
+
+    throw new Error(`Fallback API chain failed: ${errors.map(e => e.message).join(", ")}`);
+  }
+
+  private async querySingleUrl(ip: string, template: string, timeoutMs: number): Promise<IpDetails> {
+    const url = template.replace("{ip}", ip);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -416,7 +479,7 @@ export class GeoIP {
       clearTimeout(timer);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status} from ${url}`);
       }
 
       const body = await response.json();
@@ -431,25 +494,48 @@ export class GeoIP {
     const latitude = Number(body.latitude);
     const longitude = Number(body.longitude);
 
+    const country = body.countryName || body.country_name || body.country || null;
+    const countryCode = body.countryCode || body.country_code || null;
+    const subdivision = body.regionName || body.region || null;
+    const subdivisionCode = body.regionCode || body.region_code || body.region || null;
+    const continent = body.continent || body.continent_name || null;
+    const continentCode = body.continentCode || body.continent_code || null;
+    const city = body.cityName || body.city || null;
+    const postalCode = body.zipCode || body.postal || body.zip || null;
+    const timezone = body.timeZone || body.timezone || null;
+
+    let euMember = false;
+    if (body.in_eu !== undefined) {
+      euMember = !!body.in_eu;
+    } else if (body.is_in_european_union !== undefined) {
+      euMember = !!body.is_in_european_union;
+    }
+
+    const asn = body.asn ? Number(body.asn) : null;
+    const organization = body.org || body.organization || body.asn_org || null;
+    const network = body.network || null;
+
+    const isAnonymous = !!(body.isProxy || body.is_anonymous || body.is_anonymous_proxy);
+
     return {
       ip,
-      country: body.country_name || body.country || null,
-      countryCode: body.country_code || body.countryCode || null,
-      subdivision: body.region || body.regionName || null,
-      subdivisionCode: body.region_code || body.region || null,
-      continent: body.continent_name || null,
-      continentCode: body.continent_code || null,
-      city: body.city || null,
-      postalCode: body.postal || body.zip || null,
-      euMember: body.in_eu !== undefined ? !!body.in_eu : (body.is_in_european_union !== undefined ? !!body.is_in_european_union : false),
-      timezone: body.timezone || null,
+      country,
+      countryCode,
+      subdivision,
+      subdivisionCode,
+      continent,
+      continentCode,
+      city,
+      postalCode,
+      euMember,
+      timezone,
       coordinates: !Number.isNaN(latitude) && !Number.isNaN(longitude) ? { latitude, longitude } : null,
-      asn: body.asn ? Number(body.asn) : null,
-      organization: body.org || body.organization || body.asn_org || null,
-      network: body.network || null,
+      asn,
+      organization,
+      network,
       traits: {
-        isAnonymous: !!body.is_anonymous,
-        isAnonymousProxy: !!body.is_anonymous_proxy,
+        isAnonymous,
+        isAnonymousProxy: !!(body.is_anonymous_proxy || body.isProxy),
         isAnonymousVpn: !!body.is_anonymous_vpn,
         isHostingProvider: !!body.is_hosting,
         isLegitimateProxy: false,
@@ -617,6 +703,8 @@ export class GeoIP {
         await updateDb({
           outputDir: this.userDataDir ?? BUNDLED_DATA_DIR,
           lookbackMonths: config.lookbackMonths,
+          cityUrl: config.cityUrl,
+          asnUrl: config.asnUrl,
         });
         this.reload();
         config.onUpdate?.();

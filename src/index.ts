@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 // One-liner API
-export { lookup, lookupAsync } from "./singleton";
+export { lookup, lookupAsync, lookupSafe, lookupSafeAsync } from "./singleton";
 
 // Advanced API
 export { GeoIP } from "./GeoIP";

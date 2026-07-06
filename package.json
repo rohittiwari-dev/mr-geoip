@@ -53,12 +53,12 @@
   "author": "Rohit",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Rohit/mr-geoip.git"
+    "url": "git+https://github.com/rohittiwari-dev/mr-geoip.git"
   },
   "bugs": {
-    "url": "https://github.com/Rohit/mr-geoip/issues"
+    "url": "https://github.com/rohittiwari-dev/mr-geoip/issues"
   },
-  "homepage": "https://github.com/Rohit/mr-geoip#readme",
+  "homepage": "https://github.com/rohittiwari-dev/mr-geoip#readme",
   "publishConfig": {
     "access": "public"
   },

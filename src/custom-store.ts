@@ -139,7 +139,7 @@ export class CustomDataStore {
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       this.flush().catch((err) => {
-        console.error("[mr-geopip] custom store flush failed:", err);
+        console.error("[mr-geoip] custom store flush failed:", err);
       });
     }, this.flushIntervalMs);
   }

@@ -6,7 +6,7 @@ async function main() {
     const config = parseUpdateArgs(process.argv.slice(2));
     await updateDb(config);
   } catch (err: any) {
-    console.error(`[mr-geopip] CLI Update failed:`, err.message || err);
+    console.error(`[mr-geoip] CLI Update failed:`, err.message || err);
     process.exit(1);
   }
 }

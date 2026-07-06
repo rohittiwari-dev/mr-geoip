@@ -1,4 +1,4 @@
-# mr-geopip
+# mr-geoip
 
 Production-grade, runtime-agnostic IP geolocation — one-liner API with batteries included.
 
@@ -12,15 +12,15 @@ Production-grade, runtime-agnostic IP geolocation — one-liner API with batteri
 ## Install
 
 ```bash
-npm install mr-geopip
+npm install mr-geoip
 # or
-bun add mr-geopip
+bun add mr-geoip
 ```
 
 ## Quick Start
 
 ```ts
-import { lookup, lookupAsync } from "mr-geopip";
+import { lookup, lookupAsync } from "mr-geoip";
 
 // Synchronous lookup (uses local MMDB)
 const info = lookup("8.8.8.8");
@@ -63,7 +63,7 @@ interface IpDetails {
 For enterprise features — custom databases, custom data overlay, cache tuning:
 
 ```ts
-import { GeoIP } from "mr-geopip";
+import { GeoIP } from "mr-geoip";
 
 const geo = GeoIP.create({
   dataDir: "./my-paid-maxmind-dbs",   // your DBs merged over bundled
@@ -111,7 +111,7 @@ interface GeoIPConfig {
 Ensure custom IP details are safe and properly structured using the `createCustomIpData` helper:
 
 ```ts
-import { createCustomIpData } from "mr-geopip";
+import { createCustomIpData } from "mr-geoip";
 
 // Validates keys and types at runtime before writing to custom store
 const customRecord = createCustomIpData({
@@ -184,7 +184,7 @@ geo.reload(); // synchronous — re-reads MMDB files, clears cache
 ### Programmatic
 
 ```ts
-import { updateDb } from "mr-geopip";
+import { updateDb } from "mr-geoip";
 
 await updateDb({ outputDir: "./data" });
 ```
@@ -212,7 +212,7 @@ await geo.close();
 Standalone validation utilities (re-exported for convenience):
 
 ```ts
-import { isValidIP, isValidIPv4, isValidIPv6 } from "mr-geopip";
+import { isValidIP, isValidIPv4, isValidIPv6 } from "mr-geoip";
 
 isValidIP("8.8.8.8");          // true
 isValidIPv4("192.168.1.1");    // true
@@ -225,7 +225,7 @@ isValidIP("not-an-ip");       // false
 All errors extend `GeoIPError` for easy catch-all handling:
 
 ```ts
-import { InvalidIPError, DatabaseNotFoundError, GeoIPError } from "mr-geopip";
+import { InvalidIPError, DatabaseNotFoundError, GeoIPError } from "mr-geoip";
 
 try {
   lookup("bad-ip");
@@ -234,14 +234,14 @@ try {
     console.log(err.ip); // "bad-ip"
   }
   if (err instanceof GeoIPError) {
-    // Any mr-geopip error
+    // Any mr-geoip error
   }
 }
 ```
 
 ## vs geoip-lite
 
-| Feature | geoip-lite | mr-geopip |
+| Feature | geoip-lite | mr-geoip |
 |:---|:---|:---|
 | One-liner `lookup(ip)` | ✅ | ✅ |
 | Synchronous | ✅ | ✅ |

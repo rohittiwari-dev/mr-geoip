@@ -1,6 +1,4 @@
-// ---------------------------------------------------------------------------
-// mr-geopip — Public API
-// ---------------------------------------------------------------------------
+// mr-geoip — Public API
 
 // One-liner API
 export { lookup, lookupAsync, lookupSafe, lookupSafeAsync } from "./singleton";

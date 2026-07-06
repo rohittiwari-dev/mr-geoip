@@ -1,5 +1,5 @@
 /**
- * Base error class for all mr-geopip errors.
+ * Base error class for all mr-geoip errors.
  * Consumers can catch `GeoIPError` to handle any library error.
  */
 export class GeoIPError extends Error {

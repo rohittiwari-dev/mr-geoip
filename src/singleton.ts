@@ -25,7 +25,7 @@ function getDefault(): GeoIP {
  *
  * @example
  * ```ts
- * import { lookup } from "mr-geopip";
+ * import { lookup } from "mr-geoip";
  *
  * const info = lookup("8.8.8.8");
  * console.log(info.country);      // "United States"
@@ -47,7 +47,7 @@ export function lookup(ip: string, options?: LookupOptions): IpDetails {
  *
  * @example
  * ```ts
- * import { lookupAsync } from "mr-geopip";
+ * import { lookupAsync } from "mr-geoip";
  *
  * const info = await lookupAsync("8.8.8.8");
  * ```
@@ -64,7 +64,7 @@ export async function lookupAsync(ip: string, options?: LookupAsyncOptions): Pro
  *
  * @example
  * ```ts
- * import { lookupSafe } from "mr-geopip";
+ * import { lookupSafe } from "mr-geoip";
  *
  * const info = lookupSafe("invalid-ip"); // null
  * const localInfo = lookupSafe("127.0.0.1"); // null
@@ -82,7 +82,7 @@ export function lookupSafe(ip: string, options?: LookupOptions): IpDetails | nul
  *
  * @example
  * ```ts
- * import { lookupSafeAsync } from "mr-geopip";
+ * import { lookupSafeAsync } from "mr-geoip";
  *
  * const info = await lookupSafeAsync("127.0.0.1"); // null
  * ```

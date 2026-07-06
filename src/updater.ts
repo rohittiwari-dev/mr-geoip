@@ -127,7 +127,7 @@ async function downloadDataset(
  *
  * @example
  * ```ts
- * import { updateDb } from "mr-geopip";
+ * import { updateDb } from "mr-geoip";
  *
  * await updateDb({ outputDir: "./data" });
  * ```

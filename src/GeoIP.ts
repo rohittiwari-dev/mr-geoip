@@ -97,11 +97,11 @@ function applyCustomData(base: IpDetails, custom: CustomIpData): IpDetails {
  * @example
  * ```ts
  * // Simple — zero config
- * import { lookup } from "mr-geopip";
+ * import { lookup } from "mr-geoip";
  * const info = lookup("8.8.8.8");
  *
  * // Advanced — custom DBs, cache, custom data
- * import { GeoIP } from "mr-geopip";
+ * import { GeoIP } from "mr-geoip";
  * const geo = GeoIP.create({ dataDir: "./my-paid-dbs" });
  * ```
  */
@@ -710,7 +710,7 @@ export class GeoIP {
         if (config.onError) {
           config.onError(err);
         } else {
-          console.error("[mr-geopip] Auto-update failed:", err);
+          console.error("[mr-geoip] Auto-update failed:", err);
         }
       }
     };

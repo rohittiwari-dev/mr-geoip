@@ -45,6 +45,10 @@ const details = await lookupAsync("8.8.8.8");
 console.log(details.country); // "United States"
 ```
 
+> [!NOTE]
+> The async fallback endpoints (`ipapi.co` and `freeipapi.com`) are public third-party services. Usage is subject to their rate limits (e.g. 1,000 requests/day for `ipapi.co`). For high-volume production, we recommend using local databases or configuring your own paid API key. See [documentation.md](file:///d:/development/mr-geopip/documentation.md#8-third-party-apis-legal-rate-limits) for details.
+
+
 ### 3. Safe Geolocation (No-Throw APIs)
 Returns `null` instead of throwing `InvalidIPError` or returning unpopulated details for unmapped/private ranges (like loopbacks):
 

@@ -177,3 +177,31 @@ interface IpDetails {
   traits?: IpTraits;
 }
 ```
+
+---
+
+## 8. Third-Party APIs: Legal & Rate Limits
+
+By default, the asynchronous fallback chain queries third-party public API endpoints (`ipapi.co` and `freeipapi.com`). Here is what you need to know:
+
+### Terms of Service & Compliance
+- **Compliance**: Using these fallback endpoints is completely legal and standard practice. However, `mr-geoip` does not own or maintain these services. Your usage is subject to the terms and privacy policies of `ipapi.co` and `freeipapi.com`.
+- **Private Data**: Only the requested IP address is transmitted to these endpoints during fallbacks. No other telemetry or personal info is sent.
+
+### Rate Limits
+- **ipapi.co (Tier 1)**: Limited to **1,000 requests per day** per IP address on the free tier. If you exceed this, the API returns a `429 Too Many Requests` error, and `mr-geoip` will automatically fall back to Tier 2.
+- **FreeIPAPI (Tier 2)**: Limited to **60 requests per minute** per IP address. Allows commercial use on the free tier.
+
+### Production Recommendations
+To ensure reliability and compliance in high-volume production environments:
+1. **Always Use Local Databases**: Ensure `postinstall` is enabled or run `npx mr-geoip-update` as part of your deployment build. Local MMDB lookups are offline, require zero network requests, have zero latency, and support unlimited requests.
+2. **Use a Custom API URL**: If you want to use a paid tier of `ipapi.co` (with an API key) or host your own geo-lookup microservice, configure a custom `urlTemplate`:
+   ```typescript
+   const geo = GeoIP.create({
+     fallbackApi: {
+       enabled: true,
+       urlTemplate: "https://ipapi.co/{ip}/json/?key=YOUR_API_KEY"
+     }
+   });
+   ```
+

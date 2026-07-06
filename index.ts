@@ -1,12 +1,9 @@
-import {
-  getIpDetails,
-  initIpDatabases,
-  type IpDetails,
-} from "./lib/ipLocation";
-import updateDb from "./lib/update";
+import { lookup } from "./src/index";
 
-await initIpDatabases();
+// One-liner — zero config, no await
+console.log("--- mr-geopip one-liner test ---\n");
 
-export type LOOKUP = IpDetails;
-export const lookup = getIpDetails;
-export { updateDb };
+console.log("lookup('8.8.8.8') [Default, no traits]:", lookup("8.8.8.8"));
+console.log("\nlookup('8.8.8.8', { traits: true }) [With traits]:", lookup("8.8.8.8", { traits: true }));
+
+console.log("\n--- Done ---");

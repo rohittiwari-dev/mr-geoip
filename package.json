@@ -1,23 +1,57 @@
 {
   "name": "mr-geopip",
-  "module": "index.ts",
-  "type": "module",
-  "scripts": {
-    "start": "bun run index.ts",
-    "update:ipdb": "bun run scripts/update-ip-dbs.ts"
+  "version": "2.0.0",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "lru-cache": "^11.5.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "exports": {
     ".": {
-      "import": "./index.ts"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
-  "devDependencies": {
-    "@types/bun": "latest"
+  "description": "Production-grade, framework-agnostic IP geolocation with LRU caching and custom data persistence.",
+  "engines": {
+    "node": ">=18"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "files": [
+    "dist",
+    "data",
+    "README.md"
+  ],
+  "keywords": [
+    "geoip",
+    "geolocation",
+    "ip",
+    "maxmind",
+    "mmdb",
+    "lru-cache",
+    "ip-lookup"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "update:ipdb": "bun run scripts/update-ip-dbs.ts",
+    "typecheck": "tsc --noEmit"
   },
+  "type": "module",
+  "types": "./dist/index.d.ts",
   "dependencies": {
-    "@maxmind/geoip2-node": "^7.0.0"
+    "mmdb-lib": "^3.0.2"
   }
 }

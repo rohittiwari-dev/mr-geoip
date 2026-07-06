@@ -449,13 +449,13 @@ describe("GeoIP", () => {
 
       let capturedUrl: string | null = null;
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = async (url: any) => {
+      globalThis.fetch = (async (url: any) => {
         capturedUrl = String(url);
         return {
           ok: true,
           json: async () => mockResult,
         } as any;
-      };
+      }) as any;
 
       try {
         const geo = GeoIP.create({

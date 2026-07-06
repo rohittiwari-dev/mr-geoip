@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="https://github.com/rohittiwari-dev/mr-geoip">
+    <img src="https://raw.githubusercontent.com/rohittiwari-dev/mr-geoip/main/assests/banner.png" alt="mr-geoip logo" width="1024" />
+  </a>
+</p>
 # mr-geoip
 
 Production-grade, runtime-agnostic IP geolocation — one-liner API with batteries included.

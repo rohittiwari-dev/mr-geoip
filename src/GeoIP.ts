@@ -473,7 +473,11 @@ export class GeoIP {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(url, { signal: controller.signal });
+      const headers = this.fallbackApiConfig?.headers;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers,
+      });
       clearTimeout(timer);
 
       if (!response.ok) {
@@ -515,7 +519,7 @@ export class GeoIP {
 
     const isAnonymous = !!(body.isProxy || body.is_anonymous || body.is_anonymous_proxy);
 
-    return {
+    let details: IpDetails = {
       ip,
       country,
       countryCode,
@@ -544,6 +548,20 @@ export class GeoIP {
         isAnycast: false,
       },
     };
+
+    if (this.fallbackApiConfig?.mapResult) {
+      try {
+        const custom = this.fallbackApiConfig.mapResult(body);
+        details = {
+          ...details,
+          ...custom,
+          ip, // keep IP immutable
+          traits: custom.traits ? { ...details.traits, ...custom.traits } : details.traits,
+        };
+      } catch {}
+    }
+
+    return details;
   }
 
   // -----------------------------------------------------------------------

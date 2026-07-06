@@ -240,8 +240,12 @@ export interface FallbackApiConfig {
   enabled: boolean;
   /** Custom URL template, where `{ip}` is replaced with the IP string. @default "https://ipapi.co/{ip}/json/" */
   urlTemplate?: string;
-  /** Timeout in milliseconds for the HTTP request. @default 5000 */
+  /** Timeout in milliseconds for the HTTP request. @default 3000 */
   timeoutMs?: number;
+  /** Optional custom HTTP headers (e.g. API keys or Authorization headers). */
+  headers?: Record<string, string>;
+  /** Optional custom response mapping function to convert custom HTTP responses to IpDetails. */
+  mapResult?: (body: any) => Partial<IpDetails>;
 }
 
 /**

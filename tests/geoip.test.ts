@@ -624,5 +624,59 @@ describe("GeoIP", () => {
         globalThis.fetch = originalFetch;
       }
     });
+
+    it("supports custom HTTP headers and custom mapResult function", async () => {
+      const originalFetch = globalThis.fetch;
+      const headersPassed: any[] = [];
+      const mockApiResponse = {
+        some_nested_data: {
+          nation: "CustomNation",
+          code: "CN",
+          metro: "CustomMetro"
+        }
+      };
+
+      globalThis.fetch = (async (url: any, options: any) => {
+        headersPassed.push(options?.headers);
+        return {
+          ok: true,
+          json: async () => mockApiResponse,
+        } as any;
+      }) as any;
+
+      try {
+        const geo = GeoIP.create({
+          fallbackApi: {
+            enabled: true,
+            urlTemplate: "https://my-api.com/{ip}",
+            headers: {
+              "Authorization": "Bearer test-token",
+              "x-api-key": "secret-key"
+            },
+            mapResult: (body) => ({
+              country: body.some_nested_data.nation,
+              countryCode: body.some_nested_data.code,
+              city: body.some_nested_data.metro
+            })
+          }
+        });
+
+        (geo as any).bundledReaders = null;
+        (geo as any).userReaders = null;
+
+        const result = await geo.lookupAsync("8.8.8.8");
+        expect(headersPassed[0]).toEqual({
+          "Authorization": "Bearer test-token",
+          "x-api-key": "secret-key"
+        });
+        expect(result.country).toBe("CustomNation");
+        expect(result.countryCode).toBe("CN");
+        expect(result.city).toBe("CustomMetro");
+
+        await geo.close();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
   });
 });

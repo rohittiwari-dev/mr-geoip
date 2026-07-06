@@ -119,7 +119,11 @@ export class CustomDataStore {
       const json = JSON.stringify(obj, null, 2);
       const tmpPath = `${this.filePath}.tmp`;
 
-      await mkdir(dirname(this.filePath), { recursive: true });
+      try {
+        await mkdir(dirname(this.filePath), { recursive: true });
+      } catch (err: any) {
+        if (err?.code !== "EEXIST") throw err;
+      }
       await writeFile(tmpPath, json, "utf-8");
       await rename(tmpPath, this.filePath);
 

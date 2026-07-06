@@ -26,7 +26,9 @@ export function isValidIPv6(ip: string): boolean {
  * Validates the structural shape of custom IP data at runtime.
  * Throws a TypeError if types are mismatched.
  */
-export function validateCustomIpData(data: unknown): asserts data is CustomIpData {
+export function validateCustomIpData(
+  data: unknown,
+): asserts data is CustomIpData {
   if (data === null || typeof data !== "object") {
     throw new TypeError("Custom IP data must be a non-null object.");
   }
@@ -37,11 +39,18 @@ export function validateCustomIpData(data: unknown): asserts data is CustomIpDat
   if (record.coordinates !== undefined && record.coordinates !== null) {
     const coords = record.coordinates;
     if (typeof coords !== "object" || coords === null) {
-      throw new TypeError("Coordinates must be an object { latitude, longitude }.");
+      throw new TypeError(
+        "Coordinates must be an object { latitude, longitude }.",
+      );
     }
     const cRec = coords as Record<string, unknown>;
-    if (typeof cRec.latitude !== "number" || typeof cRec.longitude !== "number") {
-      throw new TypeError("Coordinates latitude and longitude must be numbers.");
+    if (
+      typeof cRec.latitude !== "number" ||
+      typeof cRec.longitude !== "number"
+    ) {
+      throw new TypeError(
+        "Coordinates latitude and longitude must be numbers.",
+      );
     }
   }
 
@@ -74,18 +83,30 @@ export function validateCustomIpData(data: unknown): asserts data is CustomIpDat
     "network",
   ];
   for (const prop of strings) {
-    if (record[prop] !== undefined && record[prop] !== null && typeof record[prop] !== "string") {
+    if (
+      record[prop] !== undefined &&
+      record[prop] !== null &&
+      typeof record[prop] !== "string"
+    ) {
       throw new TypeError(`Property "${prop}" must be a string.`);
     }
   }
 
   // Numeric properties
-  if (record.asn !== undefined && record.asn !== null && typeof record.asn !== "number") {
+  if (
+    record.asn !== undefined &&
+    record.asn !== null &&
+    typeof record.asn !== "number"
+  ) {
     throw new TypeError('Property "asn" must be a number.');
   }
 
   // Boolean properties
-  if (record.euMember !== undefined && record.euMember !== null && typeof record.euMember !== "boolean") {
+  if (
+    record.euMember !== undefined &&
+    record.euMember !== null &&
+    typeof record.euMember !== "boolean"
+  ) {
     throw new TypeError('Property "euMember" must be a boolean.');
   }
 }
@@ -99,3 +120,11 @@ export function createCustomIpData(data: CustomIpData): CustomIpData {
   return data;
 }
 
+/**
+ * Creates a validated CustomIpData object.
+ * Useful helper function for users to ensure their custom records are properly structured.
+ */
+export function createCustomIpDataSet(data: CustomIpData[]): CustomIpData[] {
+  data.forEach((item) => validateCustomIpData(item));
+  return data;
+}

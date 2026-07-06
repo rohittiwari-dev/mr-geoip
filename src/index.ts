@@ -43,6 +43,7 @@ export {
   isValidIPv6,
   createCustomIpData,
   validateCustomIpData,
+  createCustomIpDataSet,
 } from "./validate";
 
 // Updater

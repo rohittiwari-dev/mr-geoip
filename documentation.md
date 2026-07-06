@@ -55,7 +55,7 @@ By default, the chain resolves in this order:
 ### Configuring Fallbacks
 You can customize timeouts, pass authentication headers (e.g. for enterprise API keys), and supply a custom response mapper function:
 ```typescript
-import { GeoIP } from "mr-geoip";
+import { GeoIP, type IpDetails } from "mr-geoip";
 
 const geo = GeoIP.create({
   fallbackApi: {
@@ -68,7 +68,7 @@ const geo = GeoIP.create({
       "x-api-key": "enterprise-key"
     },
     // Custom mapper function to translate your API's JSON response
-    mapResult: (body) => ({
+    mapResult: (body: any): Partial<IpDetails> => ({
       country: body.location.country_name,
       countryCode: body.location.iso_code,
       city: body.location.city_name,

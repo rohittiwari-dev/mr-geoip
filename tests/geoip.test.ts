@@ -1,7 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
-import { lookup, lookupAsync, lookupSafe, lookupSafeAsync, createCustomIpData, createCustomIpDataSet } from "../src/index";
+import {
+  lookup,
+  lookupAsync,
+  lookupSafe,
+  lookupSafeAsync,
+  createCustomIpData,
+  createCustomIpDataSet,
+  IpDetails,
+} from "../src/index";
 import { GeoIP } from "../src/GeoIP";
 import {
   InvalidIPError,
@@ -165,7 +173,7 @@ describe("GeoIP", () => {
 
     it("allows overriding traits option on individual lookup calls", () => {
       const geo = GeoIP.create({ traits: false });
-      
+
       const withTraits = geo.lookup("8.8.8.8", { traits: true });
       expect(withTraits).toHaveProperty("traits");
 
@@ -281,9 +289,9 @@ describe("GeoIP", () => {
         customStore: { filePath: CUSTOM_FILE },
       });
 
-      await expect(
-        geo.setCustomData("not-ip", { city: "X" }),
-      ).rejects.toThrow(InvalidIPError);
+      await expect(geo.setCustomData("not-ip", { city: "X" })).rejects.toThrow(
+        InvalidIPError,
+      );
 
       await geo.close();
     });
@@ -354,9 +362,9 @@ describe("GeoIP", () => {
     });
 
     it("createCustomIpData rejects invalid IP", () => {
-      expect(() =>
-        createCustomIpData("not-ip", { country: "X" }),
-      ).toThrow(InvalidIPError);
+      expect(() => createCustomIpData("not-ip", { country: "X" })).toThrow(
+        InvalidIPError,
+      );
     });
 
     it("createCustomIpData rejects invalid data types", () => {
@@ -365,7 +373,9 @@ describe("GeoIP", () => {
       ).toThrow(TypeError);
 
       expect(() =>
-        createCustomIpData("10.0.0.1", { coordinates: { latitude: "bad" } as any }),
+        createCustomIpData("10.0.0.1", {
+          coordinates: { latitude: "bad" } as any,
+        }),
       ).toThrow(TypeError);
 
       expect(() =>
@@ -501,7 +511,10 @@ describe("GeoIP", () => {
         expect(result.country).toBe("Mockland");
         expect(result.countryCode).toBe("ML");
         expect(result.city).toBe("Mock City");
-        expect(result.coordinates).toEqual({ latitude: 12.34, longitude: 56.78 });
+        expect(result.coordinates).toEqual({
+          latitude: 12.34,
+          longitude: 56.78,
+        });
         expect(result.asn).toBe(99999);
         expect(result.organization).toBe("Mock ISP");
         expect(result.euMember).toBe(true);
@@ -632,8 +645,8 @@ describe("GeoIP", () => {
         some_nested_data: {
           nation: "CustomNation",
           code: "CN",
-          metro: "CustomMetro"
-        }
+          metro: "CustomMetro",
+        },
       };
 
       globalThis.fetch = (async (url: any, options: any) => {
@@ -650,15 +663,15 @@ describe("GeoIP", () => {
             enabled: true,
             urlTemplate: "https://my-api.com/{ip}",
             headers: {
-              "Authorization": "Bearer test-token",
-              "x-api-key": "secret-key"
+              Authorization: "Bearer test-token",
+              "x-api-key": "secret-key",
             },
-            mapResult: (body) => ({
+            mapResult: (body: any): Partial<IpDetails> => ({
               country: body.some_nested_data.nation,
               countryCode: body.some_nested_data.code,
-              city: body.some_nested_data.metro
-            })
-          }
+              city: body.some_nested_data.metro,
+            }),
+          },
         });
 
         (geo as any).bundledReaders = null;
@@ -666,8 +679,8 @@ describe("GeoIP", () => {
 
         const result = await geo.lookupAsync("8.8.8.8");
         expect(headersPassed[0]).toEqual({
-          "Authorization": "Bearer test-token",
-          "x-api-key": "secret-key"
+          Authorization: "Bearer test-token",
+          "x-api-key": "secret-key",
         });
         expect(result.country).toBe("CustomNation");
         expect(result.countryCode).toBe("CN");

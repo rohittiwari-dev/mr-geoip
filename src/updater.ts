@@ -2,6 +2,7 @@ import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { UpdateConfig } from "./types";
+import { BUNDLED_DATA_DIR } from "./paths";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -133,7 +134,7 @@ async function downloadDataset(
  * ```
  */
 export async function updateDb(config: UpdateConfig = {}): Promise<void> {
-  const outputDir = config.outputDir ?? "data";
+  const outputDir = config.outputDir ?? BUNDLED_DATA_DIR;
   const dryRun = config.dryRun ?? false;
 
   console.log(`Updating free IP databases into "${outputDir}"`);

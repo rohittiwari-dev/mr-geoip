@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3] - 2026-07-07
+
+### Changed
+- **Bundled Databases**: GeoLite2 City & ASN databases (~78 MB) now ship directly inside the npm package. No postinstall download required — lookups work offline immediately after `npm install`.
+- **CLI Default Path**: `npx mr-geoip-update` now correctly writes to the package's bundled `data/` directory (`node_modules/mr-geoip/data/`) instead of creating a `data/` folder in the consumer's project root.
+
+### Fixed
+- **TypeScript 6 Build**: Fixed DTS generation failure caused by tsup 8.5.1 injecting the deprecated `baseUrl` compiler option. Declarations are now generated via `tsc` directly.
+- **tsconfig.json**: Removed unused `allowImportingTsExtensions`, replaced `noEmit` with `emitDeclarationOnly` + `declaration` to support direct `tsc` declaration output.
+
+### Updated
+- **README.md**: Rewrote with exports table, CLI options table, programmatic `updateDb()` usage, and accurate package size claims.
+- **DOCUMENTATION.md**: Added programmatic database update section, auto-update config, IP validation utilities, custom data helpers, error classes table, and CLI examples.
+
+---
+
 ## [0.1.2] - 2026-07-07
 
 This is the initial production-ready release of `mr-geoip`, featuring a lightweight packaging footprint, safe no-throw API layers, custom data storage, concurrency-safe locking, and auto-updating support.

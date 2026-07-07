@@ -6,8 +6,7 @@ dist
 out
 *.tgz
 
-# databases (large binary files)
-data/*.mmdb
+# databases (temp files only)
 data/*.mmdb.tmp
 
 # custom data store

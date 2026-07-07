@@ -1,14 +1,21 @@
 {
   "name": "mr-geoip",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "devDependencies": {
-    "@types/node": "^26.1.0",
-    "lru-cache": "^11.5.1",
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "description": "A framework-agnostic IP geolocation with LRU caching and custom data persistence.",
+  "license": "MIT",
+  "author": "Rohit",
+  "scripts": {
+    "build": "tsup && tsc",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "update:ipdb": "bun run scripts/update-ip-dbs.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node -e \"import('fs').then(fs => { if (fs.existsSync('./dist/postinstall.js')) { import('./dist/postinstall.js'); } })\""
   },
   "exports": {
     ".": {
@@ -17,12 +24,11 @@
         "default": "./dist/index.js"
       },
       "require": {
-        "types": "./dist/index.d.cts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/index.cjs"
       }
     }
   },
-  "description": "A framework-agnostic IP geolocation with LRU caching and custom data persistence.",
   "bin": {
     "mr-geoip-update": "./dist/cli.js"
   },
@@ -49,8 +55,6 @@
     "bun",
     "deno"
   ],
-  "license": "MIT",
-  "author": "Rohit",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rohittiwari-dev/mr-geoip.git"
@@ -62,18 +66,14 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "update:ipdb": "bun run scripts/update-ip-dbs.ts",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "node -e \"import('fs').then(fs => { if (fs.existsSync('./dist/postinstall.js')) { import('./dist/postinstall.js'); } })\""
-  },
-  "type": "module",
-  "types": "./dist/index.d.ts",
   "dependencies": {
     "mmdb-lib": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "lru-cache": "^11.5.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

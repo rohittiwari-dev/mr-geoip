@@ -24,6 +24,12 @@ npm install mr-geoip
 bun add mr-geoip
 ```
 
+> [!NOTE]
+> On install, `mr-geoip` automatically downloads the free **GeoLite2 City & ASN** databases (~70 MB) into the package's local `data/` directory so lookups run fully offline. If the download is blocked (CI, firewalls, pnpm strict mode), lookups will still work via HTTP fallback — or you can download the databases anytime with:
+> ```bash
+> npx mr-geoip-update
+> ```
+
 ---
 
 ## Quick Start

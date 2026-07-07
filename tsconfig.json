@@ -10,11 +10,15 @@
 
     // Module resolution (compatible with tsup / bundlers)
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
+
+    // Emit (declarations only)
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "./src",
+    "declarationDir": "./dist",
 
     // Strict
     "strict": true,
@@ -29,5 +33,5 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "include": ["src"]
+  "include": ["./src"]
 }
